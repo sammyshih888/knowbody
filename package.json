@@ -1,0 +1,36 @@
+{
+  "name": "knowbody",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "dependencies": {
+    "@mit-sdg/sync-engine": "1.1.0",
+    "@mit-sdg/sync-engine-http": "1.1.0",
+    "cheerio": "1.1.2",
+    "ipaddr.js": "2.2.0",
+    "mongodb": "7.7.0",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.4",
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "6.0.10",
+    "typescript": ">=6 <7",
+    "vite": "8.3.4",
+    "vue-tsc": "3.3.13"
+  },
+  "scripts": {
+    "generate": "sync-engine artifacts pin",
+    "check": "sync-engine check && sync-engine artifacts check && vue-tsc --noEmit",
+    "check:design": "sync-engine check-design design/concepts/*.md design/types.md design/compositions/*.md",
+    "start": "bun src/main.ts",
+    "dev": "bun run db:up && bun run --parallel dev:backend dev:frontend",
+    "dev:backend": "bun --watch src/main.ts",
+    "dev:frontend": "vite",
+    "db:up": "docker compose up -d --wait mongo",
+    "db:down": "docker compose stop mongo",
+    "db:logs": "docker compose logs mongo",
+    "test": "bun test",
+    "build": "vite build"
+  }
+}
