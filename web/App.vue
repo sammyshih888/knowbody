@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { api, type Card } from "./api.ts";
-import Exchanges from "./Exchanges.vue";
-import SourceSearch from "./SourceSearch.vue";
+const route = useRoute();
+const router = useRouter();
 
 const account = ref<{ user: string; username: string } | null>(null);
 const cards = ref<Card[]>([]);
@@ -11,24 +12,13 @@ const busy = ref(false);
 const mode = ref<"register" | "sign-in">("register");
 const username = ref("");
 const password = ref("");
-const label = ref("");
-const links = ref("");
-const pageTypes = ref<Record<string, string>>({});
-const categoryOptions = ["Public webpage", "Personal site", "Professional profile", "Organization page", "Creative work"];
-const hasInvitation = ref(!!new URLSearchParams(window.location.hash.slice(1)).get("invite"));
-const updateInvitation = () => { hasInvitation.value = !!new URLSearchParams(window.location.hash.slice(1)).get("invite"); };
+const hasInvitation = computed(() => !!new URLSearchParams(route.hash.slice(1)).get("invite"));
 const error = ref("");
 const errorBox = ref<HTMLElement | null>(null);
 watch(error, async message => {
   if (message) { await nextTick(); errorBox.value?.focus(); }
 });
 const notice = ref("");
-const archiveTarget = ref<string | null>(null);
-const archiving = ref(false);
-const showArchived = ref(false);
-const visibleCards = computed(() => cards.value.filter(card => showArchived.value || !card.archived));
-const urls = computed(() => links.value.split(/\r?\n/).map(url => url.trim()).filter(Boolean));
-
 function goToSection(id: string) {
   const section = document.getElementById(id);
   section?.focus({ preventScroll: true });
@@ -90,69 +80,21 @@ async function signOut() {
     if ("error" in result) { showError(result.error); return; }
     account.value = null;
     cards.value = [];
-    links.value = "";
-    archiveTarget.value = null;
-    showArchived.value = false;
-    pageTypes.value = {};
-    label.value = "";
     notice.value = "";
     mode.value = "sign-in";
-    updateInvitation();
+    await router.replace("/cards");
   } catch { error.value = "Couldn't sign out. Please try again."; }
   finally { busy.value = false; }
 }
 
-async function saveCard() {
+watch(() => route.path, async () => {
   error.value = "";
   notice.value = "";
-  if (urls.value.length < 1 || urls.value.length > 5) {
-    error.value = "Choose between one and five links, with one link on each line.";
-    return;
-  }
-  busy.value = true;
-  try {
-    const result = await api.cards.create({ label: label.value, urls: urls.value,
-      pageTypes: urls.value.map(url => pageTypes.value[url] ?? "Public webpage") });
-    if ("error" in result) { showError(result.error, "card"); return; }
-    label.value = "";
-    links.value = "";
-    pageTypes.value = {};
-    notice.value = "Card saved. Only you can see these links.";
-    await loadCards();
-  } catch { error.value = "Couldn't save your card. Please try again."; }
-  finally { busy.value = false; }
-}
-
-function addSearchURL(url: string) {
-  if (urls.value.length >= 5 || urls.value.includes(url)) return;
-  links.value = [...urls.value, url].join("\n");
-}
-
-async function removeURL(url: string) {
-  const index = urls.value.indexOf(url);
-  links.value = urls.value.filter(value => value !== url).join("\n");
-  delete pageTypes.value[url];
   await nextTick();
-  const next = document.getElementById(`type-${Math.min(index, urls.value.length - 1)}`);
-  (next ?? document.getElementById("card-urls"))?.focus();
-}
-
-async function archiveCard(card: string) {
-  error.value = "";
-  notice.value = "";
-  archiving.value = true;
-  try {
-    const result = await api.cards.archive({ card });
-    if ("error" in result) { showError(result.error, "card"); return; }
-    archiveTarget.value = null;
-    notice.value = "Card archived. Existing active exchanges still have access until you end them.";
-    await loadCards();
-  } catch { error.value = "Couldn't archive your card. Please try again."; }
-  finally { archiving.value = false; }
-}
+  document.getElementById("main-content")?.focus({ preventScroll: true });
+});
 
 onMounted(async () => {
-  window.addEventListener("hashchange", updateInvitation);
   try {
     const current = await api.auth.current({});
     if (!("error" in current)) { account.value = current; await loadCards(); }
@@ -160,7 +102,6 @@ onMounted(async () => {
   } catch { error.value = "Couldn't connect to Knowbody. Please try again."; }
   finally { loading.value = false; }
 });
-onUnmounted(() => window.removeEventListener("hashchange", updateInvitation));
 </script>
 
 <template>
@@ -173,10 +114,10 @@ onUnmounted(() => window.removeEventListener("hashchange", updateInvitation));
   <div class="shell">
     <a class="skip-link" href="#main-content" @click.prevent="goToSection('main-content')">Skip to content</a>
     <header class="topbar">
-      <a href="/" class="brand" aria-label="Knowbody home">knowbody</a>
-      <nav v-if="account" class="section-nav" aria-label="Your workspace"><a href="#your-profiles" @click.prevent="goToSection('your-profiles')">Your profiles</a><a href="#your-exchanges" @click.prevent="goToSection('your-exchanges')">Exchanges</a></nav>
+      <RouterLink to="/cards" class="brand" aria-label="Knowbody home">knowbody</RouterLink>
+      <nav v-if="account" class="section-nav" aria-label="Your workspace"><RouterLink to="/cards" :class="{ current: route.path.startsWith('/cards') }" :aria-current="route.path.startsWith('/cards') ? 'page' : undefined">Cards</RouterLink><RouterLink to="/exchanges" :class="{ current: route.path.startsWith('/exchanges') }" :aria-current="route.path.startsWith('/exchanges') ? 'page' : undefined">Exchanges</RouterLink><RouterLink class="primary button-link top-action" to="/exchanges/new">New exchange</RouterLink></nav>
       <div v-if="account" class="account"><span>{{ account.username }}</span><button class="text-button" :disabled="busy" @click="signOut">Sign out</button></div>
-      <span v-else class="header-note">A little context. On your terms.</span>
+      <span v-else class="header-note">Exchange public profiles by agreement.</span>
     </header>
 
     <main id="main-content" tabindex="-1">
@@ -187,10 +128,10 @@ onUnmounted(() => window.removeEventListener("hashchange", updateInvitation));
 
         <div v-if="!account" class="welcome">
           <section class="intro">
-            <p class="eyebrow">YOUR PAGES, YOUR CHOICE</p>
-            <h1>A little more context.<br />A choice in what you share.</h1>
-            <p>Start with the public pages that tell your story. Save them together in a private card, ready for an introduction.</p>
-            <div class="privacy-note"><p>You choose the links.<br /><strong>Private until you both approve.</strong></p></div>
+            <p class="eyebrow">MEET WITH MORE CONTEXT</p>
+            <h1>Exchange public profiles<br />before you meet.</h1>
+            <p>Knowbody lets two people choose and exchange links to their own public pages. Save your links in a card, invite someone, and both approve before either card is shared.</p>
+            <div class="privacy-note"><p>You each choose what to share.<br /><strong>Both approve before cards are shared.</strong></p></div>
           </section>
           <section class="panel auth-panel" aria-labelledby="account-heading">
             <p v-if="hasInvitation" class="message success">You've received an invitation. Create an account or sign in, then choose Join invitation.</p>
@@ -198,8 +139,8 @@ onUnmounted(() => window.removeEventListener("hashchange", updateInvitation));
               <button :class="{ selected: mode === 'register' }" :disabled="busy" :aria-pressed="mode === 'register'" @click="mode = 'register'; error = ''; notice = ''">Create account</button>
               <button :class="{ selected: mode === 'sign-in' }" :disabled="busy" :aria-pressed="mode === 'sign-in'" @click="mode = 'sign-in'; error = ''; notice = ''">Sign in</button>
             </div>
-            <h2 id="account-heading">{{ mode === 'register' ? 'Make yourself at home.' : 'Welcome back.' }}</h2>
-            <p class="muted">{{ mode === 'register' ? 'Create an account to save your first selection.' : 'Sign in to see your saved cards.' }}</p>
+            <h2 id="account-heading">{{ mode === 'register' ? 'Create your account' : 'Sign in to Knowbody' }}</h2>
+            <p class="muted">{{ mode === 'register' ? 'Save a private card, then invite someone to exchange cards.' : 'Return to your cards and exchanges.' }}</p>
             <form @submit.prevent="submitAccount">
               <label for="username">Username</label>
               <input id="username" v-model="username" autocomplete="username" required pattern="[A-Za-z0-9_-]{1,32}" maxlength="32" aria-describedby="username-hint" />
@@ -211,53 +152,13 @@ onUnmounted(() => window.removeEventListener("hashchange", updateInvitation));
           </section>
         </div>
 
-        <section v-else id="your-profiles" tabindex="-1">
-          <p class="eyebrow">YOUR PROFILES / PRIVATE SELECTIONS</p>
-          <h1>What would you like to share?</h1>
-          <p class="lead">Choose 1–5 public pages. Nothing is shared when you save a card.</p>
-          <div class="workspace">
-            <section class="panel" aria-labelledby="new-card-heading">
-              <div class="panel-heading"><h2 id="new-card-heading">Create a card</h2><span class="count">{{ urls.length }} / 5</span></div>
-              <div class="source-picker">
-              <SourceSearch :key="account.user" :selected="urls" @select="addSearchURL" @expired="showError('UNAUTHORIZED')" />
-              <form @submit.prevent="saveCard">
-                <h3>Your selection</h3>
-                <label for="card-label">Save this selection as</label>
-                <input id="card-label" v-model="label" required maxlength="80" placeholder="Portfolio + club bio" />
-                <label for="card-urls">Public page links</label>
-                <textarea id="card-urls" v-model="links" rows="3" required placeholder="https://your-website.com/about&#10;https://your-club.org/people/you" aria-describedby="links-hint"></textarea>
-                <small id="links-hint">One HTTPS link per line, up to five. Choose pages about you that you're comfortable sharing.</small>
-                <fieldset v-if="urls.length > 0 && urls.length <= 5" class="page-types"><legend>Choose each page type</legend><p class="muted">Only these categories appear to the other person before approval.</p><div v-for="(url, i) in urls" :key="`${i}-${url}`" class="selected-page"><div class="selection-heading"><label :for="`type-${i}`">{{ url }}</label><button type="button" class="text-button" :aria-label="`Remove ${url}`" @click="removeURL(url)">Remove</button></div><select :id="`type-${i}`" :value="pageTypes[url] ?? 'Public webpage'" @change="pageTypes[url] = ($event.target as HTMLSelectElement).value"><option v-for="category in categoryOptions" :key="category">{{ category }}</option></select></div></fieldset>
-                <p v-if="urls.length" class="selection-status" role="status">{{ urls.length }} {{ urls.length === 1 ? 'page' : 'pages' }} selected. Nothing is shared yet.</p>
-                <p class="save-note">Saved selections stay fixed. To choose different links, make another card.</p>
-                <button class="primary full" :disabled="busy">{{ busy ? 'Saving…' : 'Save private card' }}</button>
-              </form>
-              </div>
-            </section>
-            <section class="saved" aria-labelledby="saved-heading">
-              <div class="panel-heading"><h2 id="saved-heading">Your saved cards</h2><span class="muted">{{ visibleCards.length }}</span></div>
-              <button v-if="cards.some(card => card.archived)" class="text-button" :aria-pressed="showArchived" @click="showArchived = !showArchived">{{ showArchived ? 'Hide archived cards' : 'Show archived cards' }}</button>
-              <div v-if="!cards.length" class="empty-state"><span class="empty-mark" aria-hidden="true">▤</span><h3>Your first introduction starts here.</h3><p>Add a few links and give your selection a name. You'll find your saved cards here.</p></div>
-              <p v-if="cards.length && !visibleCards.length" class="muted">All your cards are archived. Create a new card to start another exchange.</p>
-              <article v-for="card in visibleCards" :key="card.card" class="saved-card">
-                <div class="panel-heading"><h3>{{ card.label }}</h3><span class="badge">{{ card.archived ? 'Archived' : 'Saved' }}</span></div>
-                <ul><li v-for="url in card.urls" :key="url"><a :href="url" target="_blank" rel="noopener noreferrer">{{ url }} <span aria-hidden="true">↗</span></a></li></ul>
-                <p class="card-footer">{{ card.pageTypes.join(' · ') }} · Sharing managed per exchange</p>
-                <template v-if="!card.archived">
-                  <div v-if="archiveTarget === card.card" class="card-confirmation">
-                    <p>Archive this card? It cannot be used for new exchanges. Existing active exchanges keep their access until you end them. To use these links again, save a new card.</p>
-                    <button class="primary" :disabled="archiving" @click="archiveCard(card.card)">{{ archiving ? 'Archiving…' : 'Archive card' }}</button>
-                    <button class="text-button" :disabled="archiving" @click="archiveTarget = null">Keep card</button>
-                  </div>
-                  <button v-else class="text-button" :disabled="archiving" @click="archiveTarget = card.card">Archive</button>
-                </template>
-              </article>
-            </section>
-          </div>
-          <Exchanges :key="account.user" :cards="cards" :username="account.username" @expired="showError('UNAUTHORIZED')" />
-        </section>
+        <RouterView v-else v-slot="{ Component }">
+          <KeepAlive :key="account.user">
+            <component :is="Component" :cards="cards" :username="account.username" :reload-cards="loadCards" @expired="showError('UNAUTHORIZED')" />
+          </KeepAlive>
+        </RouterView>
       </template>
     </main>
-    <footer>Knowbody <span>Choose what people get to know.</span></footer>
+    <footer>Knowbody <span>Exchange public profiles with mutual approval.</span></footer>
   </div>
 </template>

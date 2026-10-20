@@ -23,13 +23,13 @@ async function search() {
     if (response.status === 401) { emit("expired"); return; }
     if (!response.ok) {
       error.value = data.error === "SEARCH_LIMIT"
-        ? "Search is temporarily limited. Wait a few seconds before trying again. If the free monthly allowance is used up, you can still paste your links below."
-        : "Search is unavailable right now. You can still paste your public page links below.";
+        ? "Search is temporarily limited. Wait a few seconds before trying again. If the free monthly allowance is used up, you can still paste links under Public page links."
+        : "Search is unavailable right now. You can still paste links under Public page links.";
       return;
     }
     results.value = data.results;
     searched.value = true;
-  } catch { error.value = "Couldn't load search results. Try again or paste your links below."; }
+  } catch { error.value = "Couldn't load search results. Try again or paste links under Public page links."; }
   finally { busy.value = false; }
 }
 </script>
@@ -44,9 +44,9 @@ async function search() {
       <small id="search-privacy">Search terms go to Tavily. Results stay out of your card until you select them.</small>
       <button class="primary" :disabled="busy || !query.trim()">{{ busy ? 'Searching…' : 'Search' }}</button>
     </form>
-    <p v-if="busy" role="status" class="muted">Looking for candidate pages…</p>
+    <p v-if="busy" role="status" class="muted">Searching for public pages…</p>
     <p v-if="error" role="alert" class="message error">{{ error }}</p>
-    <p v-if="searched && !results.length" role="status" class="muted">No selectable public HTTPS pages found. Try another query or paste a link below.</p>
+    <p v-if="searched && !results.length" role="status" class="muted">No selectable public HTTPS pages found. Try another search or paste a link under Public page links.</p>
     <p v-else-if="searched" role="status" class="muted">{{ results.length }} suggestions. A matching name does not establish that a page is yours.</p>
     <ul class="search-results">
       <li v-for="result in results" :key="result.url">
@@ -55,6 +55,6 @@ async function search() {
         <button class="text-button" :disabled="selected(result.url) || props.selected.length >= 5" @click="emit('select', result.url)">{{ selected(result.url) ? 'Added to selection' : 'Add to selection' }}</button>
       </li>
     </ul>
-    <p v-if="props.selected.length >= 5" class="muted">Your selection has five links. Remove a link below to choose another.</p>
+    <p v-if="props.selected.length >= 5" class="muted">Your selection has five links. Remove a link from your selection to choose another.</p>
   </section>
 </template>

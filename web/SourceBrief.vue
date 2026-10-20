@@ -15,7 +15,7 @@ const repeatedPage = (details: ReportDetails) => {
     <p v-else-if="details.status === 'CANCELLED'" class="muted">The exchange ended before this brief was completed.</p>
     <p v-else-if="details.status === 'FAILED'" class="muted">This brief could not be prepared. You can still open the selected sources. Start a new exchange to try again.</p>
     <template v-else>
-      <p class="muted">Excerpts from the selected pages, with their sources. They do not verify identity or trustworthiness.</p>
+      <p class="muted">Excerpts and comparisons from this card's public pages. This brief does not verify identity or trustworthiness.</p>
       <p v-if="repeatedPage(details)" class="muted">Some selected links lead to the same page. They are not separate sources of evidence.</p>
       <div class="brief-layout">
       <section class="source-links"><h4>Comparisons between selected pages</h4>
@@ -42,7 +42,7 @@ const repeatedPage = (details: ReportDetails) => {
           <small v-if="source.finalUrl && source.finalUrl !== source.url">Redirected on the same website to <a :href="source.finalUrl" target="_blank" rel="noopener noreferrer">{{ source.finalUrl }}</a></small>
           <small>Retrieved {{ date(source.retrievedAt) }} · {{ source.pageDate ? `Page date supplied by source: ${source.pageDate}` : 'Page date not detected' }}</small>
         </template>
-        <p v-else class="unchecked"><strong>Content not checked</strong><br />This page could not be read as public HTML. This says nothing about the person.<small>Attempted {{ date(source.retrievedAt) }}</small></p>
+        <p v-else class="unchecked"><strong>Content not checked</strong><br />Knowbody couldn't read this page. It may require sign-in, block automated access, or be temporarily unavailable. Open the source link to view it yourself. This page wasn't used in comparisons.<small>Attempted {{ date(source.retrievedAt) }}</small></p>
       </article>
         </aside>
       </div>
