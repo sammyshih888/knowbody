@@ -25,7 +25,8 @@ const categoryOptions = ["Public webpage", "Personal site", "Professional profil
 const archiveTarget = ref<string | null>(null);
 const archiving = ref(false);
 const showArchived = ref(false);
-const visibleCards = computed(() => props.cards.filter(card => showArchived.value || !card.archived));
+const savedCards = computed(() => props.cards.filter(card => !card.archived));
+const archivedCards = computed(() => props.cards.filter(card => card.archived));
 const urls = computed(() => links.value.split(/\r?\n/).map(url => url.trim()).filter(Boolean));
 
 function showError(code: string) {
@@ -119,23 +120,30 @@ async function archiveCard(card: string) {
               </div>
             </section>
             <section v-if="!creating" class="saved" aria-labelledby="saved-heading">
-              <div class="panel-heading"><h2 id="saved-heading">Saved cards</h2><span class="muted">{{ visibleCards.length }}</span></div>
-              <button v-if="cards.some(card => card.archived)" class="text-button" :aria-pressed="showArchived" @click="showArchived = !showArchived">{{ showArchived ? 'Hide archived cards' : 'Show archived cards' }}</button>
+              <div class="panel-heading"><h2 id="saved-heading">Saved cards</h2><span class="muted">{{ savedCards.length }}</span></div>
               <div v-if="!cards.length" class="empty-state"><span class="empty-mark" aria-hidden="true">▤</span><h3>No cards yet.</h3><p>Create a card with the public pages you want to share.</p><RouterLink class="primary button-link" to="/cards/new">Create your first card</RouterLink></div>
-              <p v-if="cards.length && !visibleCards.length" class="muted">All your cards are archived. Create a new card to start another exchange.</p>
-              <article v-for="card in visibleCards" :key="card.card" class="saved-card">
-                <div class="panel-heading"><h3>{{ card.label }}</h3><span class="badge">{{ card.archived ? 'Archived' : 'Saved' }}</span></div>
+              <p v-if="cards.length && !savedCards.length" class="muted">All your cards are archived. Create a new card to start another exchange.</p>
+              <article v-for="card in savedCards" :key="card.card" class="saved-card">
+                <div class="panel-heading"><h3>{{ card.label }}</h3><span class="badge">Saved</span></div>
                 <ul><li v-for="url in card.urls" :key="url"><a :href="url" target="_blank" rel="noopener noreferrer">{{ url }} <span aria-hidden="true">↗</span></a></li></ul>
                 <p class="card-footer">{{ card.pageTypes.join(' · ') }} · Sharing managed per exchange</p>
-                <template v-if="!card.archived">
-                  <div v-if="archiveTarget === card.card" class="card-confirmation">
-                    <p>Archive this card? It cannot be offered in new exchanges. Any exchange still awaiting approval needs a replacement card. Already-shared exchanges keep access until someone ends them. To reuse these links, save a new card.</p>
-                    <button class="primary" :disabled="archiving" @click="archiveCard(card.card)">{{ archiving ? 'Archiving…' : 'Archive card' }}</button>
-                    <button class="text-button" :disabled="archiving" @click="archiveTarget = null">Keep card</button>
-                  </div>
-                  <button v-else class="text-button" :disabled="archiving" @click="archiveTarget = card.card">Archive</button>
-                </template>
+                <div v-if="archiveTarget === card.card" class="card-confirmation">
+                  <p>Archive this card? It cannot be offered in new exchanges. Any exchange still awaiting approval needs a replacement card. Already-shared exchanges keep access until someone ends them. To reuse these links, save a new card.</p>
+                  <button class="primary" :disabled="archiving" @click="archiveCard(card.card)">{{ archiving ? 'Archiving…' : 'Archive card' }}</button>
+                  <button class="text-button" :disabled="archiving" @click="archiveTarget = null">Keep card</button>
+                </div>
+                <button v-else class="text-button" :disabled="archiving" @click="archiveTarget = card.card">Archive</button>
               </article>
+              <div v-if="archivedCards.length" class="archived-history">
+                <button class="text-button" :aria-expanded="showArchived" aria-controls="archived-cards" @click="showArchived = !showArchived">{{ showArchived ? 'Hide archived cards' : 'Show archived cards' }}</button>
+                <section v-show="showArchived" id="archived-cards" aria-label="Archived cards">
+                  <article v-for="card in archivedCards" :key="card.card" class="saved-card">
+                    <div class="panel-heading"><h3>{{ card.label }}</h3><span class="badge badge-neutral">Archived</span></div>
+                    <ul><li v-for="url in card.urls" :key="url"><a :href="url" target="_blank" rel="noopener noreferrer">{{ url }} <span aria-hidden="true">↗</span></a></li></ul>
+                    <p class="card-footer">{{ card.pageTypes.join(' · ') }} · Sharing managed per exchange</p>
+                  </article>
+                </section>
+              </div>
             </section>
           </div>
   </section>

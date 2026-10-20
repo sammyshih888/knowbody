@@ -48,6 +48,15 @@ small { display: block; font-size: 13px; color: var(--muted); line-height: 1.7; 
 .primary { background: var(--green); border: 1px solid var(--green); border-radius: 5px; color: white; padding: 13px 20px; font-size: 14px; font-weight: 500; }
 .primary:hover:not(:disabled) { background: #193b2d; }
 .primary:disabled { background: #748276; border-color: #748276; opacity: 1; }
+.danger-button { background: #9e342d; border: 1px solid #9e342d; border-radius: 5px; color: white; padding: 13px 20px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.danger-button:hover:not(:disabled) { background: #7f2823; border-color: #7f2823; }
+.danger-button:focus-visible { outline-color: #9e342d; }
+.end-confirmation { margin-bottom: 28px; padding: 22px 24px; border: 1px solid #d8aaa5; border-radius: 8px; background: #fff1ec; }
+.end-confirmation:focus { outline: 3px solid #9e342d; outline-offset: 3px; }
+.end-confirmation h2 { color: #8d3624; }
+.end-confirmation p { font-size: 14px; }
+.confirmation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.confirmation-actions button { min-height: 44px; }
 .full { width: 100%; margin-top: 26px; }
 .workspace { display: grid; grid-template-columns: 1fr; gap: 28px; align-items: start; }
 .source-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; margin-top: 24px; }
@@ -66,6 +75,9 @@ small { display: block; font-size: 13px; color: var(--muted); line-height: 1.7; 
 .search-results a, .search-results small { overflow-wrap: anywhere; }
 .saved { padding-top: 8px; }
 .saved > .panel-heading { margin: 0 0 23px; }
+.archived-history { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.archived-history > button { min-height: 44px; }
+.archived-history > section { margin-top: 16px; }
 .empty-state { border: 1px solid var(--line); border-radius: 8px; text-align: center; padding: 32px; background: var(--tint); }
 .empty-mark { font-size: 32px; color: #88977b; display: block; margin-bottom: 20px; }
 .empty-state h3 { font-size: 16px; font-weight: 500; }
@@ -106,7 +118,6 @@ small { display: block; font-size: 13px; color: var(--muted); line-height: 1.7; 
 .offer-controls { display: flex; gap: 12px; }
 .offer-controls select { flex: 1; min-width: 0; }
 .offer-controls button { white-space: nowrap; }
-.exchange-footer { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-top: 24px; }
 @media (max-width: 600px) { .offer-grid { grid-template-columns: 1fr; } .offer-side { padding: 20px; } .offer-side + .offer-side { border-left: 0; border-top: 1px solid #c9d2c0; } .offer-controls { flex-direction: column; } }
 footer { min-height: 70px; border-top: 1px solid #dddfd6; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; }
 @media (max-width: 800px) { .welcome { grid-template-columns: 1fr; gap: 28px; padding-top: 8px; } .intro h1 { font-size: 38px; } .privacy-note { margin-top: 20px; } .auth-panel { max-width: 560px; width: 100%; } .topbar { gap: 22px; } .header-note { display: none; } main { padding-top: 24px; } }
@@ -149,6 +160,7 @@ select:focus-visible, summary:focus-visible { outline: 3px solid #264b3c; outlin
 .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .page-heading > div { min-width: 0; }
 .page-heading .button-link { flex-shrink: 0; }
+.page-heading > .danger-button { flex-shrink: 0; margin-bottom: 24px; }
 .back-link { display: inline-block; font-size: 14px; color: var(--green); text-underline-offset: 4px; margin-bottom: 24px; }
 .empty-state .button-link { margin-top: 24px; }
 .list-filters { display: flex; gap: 8px; border-bottom: 1px solid var(--line); margin: 4px 0 24px; }
@@ -200,7 +212,6 @@ select:focus-visible, summary:focus-visible { outline: 3px solid #264b3c; outlin
   .exchange-actions { grid-template-columns: 1fr; }
   .exchange-card { padding: 20px; }
   .source-picker > form { padding: 18px; }
-  .exchange-footer { align-items: baseline; flex-wrap: wrap; }
   .page-heading { flex-wrap: wrap; gap: 0; margin-bottom: 24px; }
   .page-heading .lead { margin-bottom: 18px; }
   .exchange-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 20px; }

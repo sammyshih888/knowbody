@@ -34,6 +34,8 @@ const visibleExchanges = computed(() => showEnded.value ? ended.value : ongoing.
 const unavailable = ref(false);
 const checkingAccess = ref(true);
 const ending = ref<string | null>(null);
+const endButton = ref<HTMLButtonElement | null>(null);
+const endConfirmation = ref<HTMLElement | null>(null);
 let timer: ReturnType<typeof setInterval> | undefined;
 let active = false;
 let disposed = false;
@@ -157,6 +159,16 @@ const saveOffer = (entry: Exchange) => act("offer", () => api.exchanges.offer({
   exchange: entry.exchange, card: selections.value[entry.exchange]!, revision: entry.summary.revision,
 }));
 const approveExchange = (entry: Exchange) => act("approve", () => api.exchanges.approve({ exchange: entry.exchange, revision: entry.summary.revision }));
+async function confirmEnd(entry: Exchange) {
+  ending.value = entry.exchange;
+  await nextTick();
+  endConfirmation.value?.focus();
+}
+async function keepExchange() {
+  ending.value = null;
+  await nextTick();
+  endButton.value?.focus();
+}
 const endExchange = (entry: Exchange) => act("end", async () => {
   const result = await api.exchanges.end({ exchange: entry.exchange });
   if (!("error" in result)) {
@@ -192,10 +204,21 @@ onUnmounted(() => { disposed = true; });
     <div class="page-heading"><div>
       <h1 id="exchanges-heading">{{ pageTitle }}</h1>
       <p class="lead">{{ pageDescription }}</p>
-    </div></div>
+    </div>
+    <button v-if="!listing && !creating && currentExchange && currentExchange.summary.status !== 'ENDED'" ref="endButton" class="danger-button" :disabled="busy || unavailable || checkingAccess" :aria-expanded="ending === currentExchange.exchange" aria-controls="end-exchange-confirmation" @click="confirmEnd(currentExchange)">End exchange</button>
+    </div>
     <div v-if="error" ref="errorBox" class="message error" role="alert" tabindex="-1">{{ error }}</div>
     <div v-if="notice" class="message success" role="status">{{ notice }}</div>
     <div v-if="unavailable" class="message error" role="status">Updates are unavailable. The last displayed state may be out of date. <button class="text-button" :disabled="busy || refreshing" @click="refresh">Retry</button></div>
+    <section v-if="!listing && !creating && currentExchange && ending === currentExchange.exchange && currentExchange.summary.status !== 'ENDED'" id="end-exchange-confirmation" ref="endConfirmation" class="end-confirmation" aria-labelledby="end-confirmation-heading" tabindex="-1">
+      <h2 id="end-confirmation-heading">End this exchange?</h2>
+      <p v-if="currentExchange.summary.status === 'ACTIVE'">Both of you lose access through this exchange to the other's card and brief. Unfinished research stops. Your own cards and completed briefs remain. This exchange cannot be reopened.</p>
+      <p v-else>This invitation will close and neither card will be shared. Your saved cards remain. This exchange cannot be reopened.</p>
+      <div class="confirmation-actions">
+        <button class="danger-button" :disabled="busy || unavailable || checkingAccess" @click="endExchange(currentExchange)">{{ busy ? 'Ending…' : 'Yes, end exchange' }}</button>
+        <button class="text-button" :disabled="busy" @click="keepExchange">Keep exchange</button>
+      </div>
+    </section>
     <div v-if="creating" class="workspace exchange-actions">
       <form class="panel" @submit.prevent="createInvitation">
         <h2>Invite someone</h2>
@@ -292,13 +315,6 @@ onUnmounted(() => { disposed = true; });
       </div>
       <details v-if="entry.summary.status === 'ENDED' && entry.ownBrief.report" class="own-brief"><summary>Your retained source brief</summary><SourceBrief :details="entry.ownBrief.details" heading="Your source brief" /></details>
       <p v-if="entry.summary.status === 'ACTIVE'" class="muted">Either person can end shared access. Information already seen or copied cannot be taken back.</p>
-      <div v-if="ending === entry.exchange && entry.summary.status !== 'ENDED'" class="approval-panel">
-        <h3>End this exchange?</h3>
-        <p>Both of you lose access through this exchange to the other's card and brief. Unfinished research stops. Your own cards and completed briefs remain. This exchange cannot be reopened.</p>
-        <button class="primary" :disabled="busy || unavailable || checkingAccess" @click="endExchange(entry)">End shared access</button>
-        <button class="text-button" :disabled="busy" @click="ending = null">Keep exchange</button>
-      </div>
-      <div v-if="entry.summary.status !== 'ENDED' && ending !== entry.exchange" class="exchange-footer"><button class="text-button" :disabled="busy || unavailable || checkingAccess" @click="ending = entry.exchange">End exchange</button></div>
     </article>
   </section>
 </template>
