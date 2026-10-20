@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { api, type Card, type Exchange } from "./api.ts";
 import SourceBrief from "./SourceBrief.vue";
 
-const props = defineProps<{ cards: Card[] }>();
+const props = defineProps<{ cards: Card[]; username: string }>();
 const emit = defineEmits<{ expired: [] }>();
 const exchanges = ref<Exchange[]>([]);
 const inviteCard = ref("");
@@ -11,10 +11,15 @@ const invitation = ref(new URLSearchParams(window.location.hash.slice(1)).get("i
 const selections = ref<Record<string, string>>({});
 const consent = ref<Record<string, number | null>>({});
 const error = ref("");
+const errorBox = ref<HTMLElement | null>(null);
+watch(error, async message => {
+  if (message) { await nextTick(); errorBox.value?.focus(); }
+});
 const notice = ref("");
 const busy = ref(false);
 const refreshing = ref(false);
 const unavailable = ref(false);
+const ending = ref<string | null>(null);
 let timer: ReturnType<typeof setInterval>;
 let disposed = false;
 let refreshVersion = 0;
@@ -100,6 +105,7 @@ const approveExchange = (entry: Exchange) => act("approve", () => api.exchanges.
 const endExchange = (entry: Exchange) => act("end", async () => {
   const result = await api.exchanges.end({ exchange: entry.exchange });
   if (!("error" in result)) {
+    ending.value = null;
     entry.summary.status = "ENDED";
     entry.shared = { card: null, label: null, urls: null, pageTypes: null, brief: { report: null, details: null } };
     if (entry.ownBrief.details?.status === "PENDING") entry.ownBrief.details.status = "CANCELLED";
@@ -123,11 +129,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="exchanges-section" aria-labelledby="exchanges-heading">
-    <p class="eyebrow">A MUTUAL INTRODUCTION</p>
-    <div class="panel-heading"><h2 id="exchanges-heading">Your exchanges</h2><span class="badge">Private until mutual approval</span></div>
+  <section id="your-exchanges" class="exchanges-section" aria-labelledby="exchanges-heading" tabindex="-1">
+    <p class="eyebrow">YOUR EXCHANGES</p>
+    <h2 id="exchanges-heading" class="section-title">A little more of each other.</h2>
+    <p class="lead">Choose what to share. Open it together.</p>
     <p class="muted">Create an invitation or join one you've received. Both approve the same selection before exact links and source briefs are shared.</p>
-    <div v-if="error" class="message error" role="alert">{{ error }}</div>
+    <div v-if="error" ref="errorBox" class="message error" role="alert" tabindex="-1">{{ error }}</div>
     <div v-if="notice" class="message success" role="status">{{ notice }}</div>
     <div v-if="unavailable" class="message error" role="status">Updates are unavailable. The last displayed state may be out of date. <button class="text-button" :disabled="busy || refreshing" @click="refresh">Retry</button></div>
     <div class="workspace exchange-actions">
@@ -151,7 +158,7 @@ onUnmounted(() => {
     </div>
     <p v-if="!exchanges.length" class="muted">{{ refreshing ? 'Loading your exchanges…' : 'No exchanges yet. Start with one of your saved cards.' }}</p>
     <article v-for="entry in exchanges" :key="entry.exchange" class="saved-card exchange-card">
-      <div class="panel-heading"><h3>{{ entry.partner?.username ? `Exchange with ${entry.partner.username}` : entry.summary.status === 'ENDED' ? 'Unclaimed invitation' : 'Waiting for someone to join' }}</h3><span class="badge">{{ entry.summary.status === 'ENDED' ? 'Ended' : entry.summary.status === 'ACTIVE' ? 'Shared' : 'Not shared' }}</span></div>
+      <div class="panel-heading"><h3>{{ entry.partner?.username ? `Exchange with ${entry.partner.username}` : entry.summary.status === 'ENDED' ? 'Unclaimed invitation' : 'Waiting for someone to join' }}</h3><span class="badge" :class="{ 'badge-neutral': entry.summary.status !== 'ACTIVE' }">{{ entry.summary.status === 'ENDED' ? 'Ended' : entry.summary.status === 'ACTIVE' ? 'Shared' : 'Not shared' }}</span></div>
       <p v-if="entry.partner?.username && entry.summary.status === 'OPEN'" class="muted">Check that <strong>{{ entry.partner.username }}</strong> is the account you meant to exchange with.</p>
       <div v-if="entry.summary.invitation" class="invitation-box">
         <label :for="`link-${entry.exchange}`">Your invitation link</label>
@@ -159,29 +166,35 @@ onUnmounted(() => {
         <button class="text-button" @click="copy(entry.summary.invitation)">Copy invitation</button>
       </div>
       <div class="offer-grid">
-        <div><p class="eyebrow">YOUR OFFER</p><h3>{{ ownCard(entry)?.label ?? (entry.summary.status === 'ENDED' ? 'No offer saved' : 'Choose a card below') }}</h3>
+        <section class="offer-side">
+          <div class="participant"><span class="participant-initial" aria-hidden="true">{{ username.charAt(0).toUpperCase() }}</span><h4>You · {{ username }}</h4></div>
+          <div class="offer-details"><p class="eyebrow">YOUR SELECTED CARD</p><h5>{{ ownCard(entry)?.label ?? (entry.summary.status === 'ENDED' ? 'No offer saved' : 'Choose a card below') }}</h5>
           <ul v-if="ownCard(entry)"><li v-for="url in ownCard(entry)!.urls" :key="url"><a :href="url" target="_blank" rel="noopener noreferrer">{{ url }}</a></li></ul>
-          <small>{{ entry.summary.ownPreview ?? 'No offer saved yet.' }}</small>
-        </div>
-        <div><p class="eyebrow">THEIR OFFER</p>
-          <template v-if="entry.summary.status === 'ACTIVE' && entry.shared.card && !unavailable"><h3>{{ entry.shared.label }}</h3><ul><li v-for="url in entry.shared.urls" :key="url"><a :href="url" target="_blank" rel="noopener noreferrer">{{ url }}</a></li></ul><small>{{ entry.shared.pageTypes?.join(' · ') }}</small></template>
+          <small>{{ entry.summary.ownPreview ?? 'No offer saved yet.' }}</small></div>
+          <p v-if="entry.summary.status === 'OPEN' && entry.summary.ownItem && entry.summary.otherPreview" class="approval-status"><span class="approval-mark" :class="{ approved: entry.summary.ownApproved }" aria-hidden="true">{{ entry.summary.ownApproved ? '✓' : '' }}</span>{{ entry.summary.ownApproved ? 'You approved' : 'Awaiting your approval' }}</p>
+        </section>
+        <section class="offer-side">
+          <div class="participant"><span class="participant-initial" aria-hidden="true">{{ entry.partner?.username?.charAt(0).toUpperCase() ?? '?' }}</span><h4>{{ entry.partner?.username ?? 'Your partner' }}</h4></div>
+          <div class="offer-details"><p class="eyebrow">{{ entry.summary.status === 'ACTIVE' ? 'SHARED CARD' : 'OFFERED PAGE TYPES' }}</p>
+          <template v-if="entry.summary.status === 'ACTIVE' && entry.shared.card && !unavailable"><h5>{{ entry.shared.label }}</h5><ul><li v-for="url in entry.shared.urls" :key="url"><a :href="url" target="_blank" rel="noopener noreferrer">{{ url }}</a></li></ul><small>{{ entry.shared.pageTypes?.join(' · ') }}</small></template>
           <template v-else-if="entry.summary.status === 'ENDED'"><p>Shared access ended.</p><small>The other person's card and brief are no longer available through this exchange.</small></template>
           <template v-else-if="entry.summary.status === 'ACTIVE'"><p>{{ unavailable ? 'Reconnect to view shared material.' : 'Preparing shared access…' }}</p></template>
-          <template v-else><p>{{ entry.summary.otherPreview ?? (entry.partner?.username ? 'Waiting for their selection.' : 'Waiting for someone to join.') }}</p><small v-if="entry.summary.otherPreview">Page types chosen by the owner. Exact links stay hidden.</small></template>
-        </div>
+          <template v-else><ul v-if="entry.summary.otherPreview" class="preview-types"><li v-for="(pageType, index) in entry.summary.otherPreview.split(', ')" :key="index">{{ pageType }}</li></ul><p v-else>{{ entry.partner?.username ? 'Waiting for their selection.' : 'Waiting for someone to join.' }}</p><small v-if="entry.summary.otherPreview">Page types chosen by the owner. Exact links stay hidden.</small></template>
+          </div>
+          <p v-if="entry.summary.status === 'OPEN' && entry.summary.ownItem && entry.summary.otherPreview" class="approval-status"><span class="approval-mark" :class="{ approved: entry.summary.otherApproved }" aria-hidden="true">{{ entry.summary.otherApproved ? '✓' : '' }}</span>{{ entry.summary.otherApproved ? 'They approved' : 'Awaiting their approval' }}</p>
+        </section>
       </div>
       <form v-if="entry.summary.status === 'OPEN'" class="offer-form" @submit.prevent="saveOffer(entry)">
         <label :for="`offer-${entry.exchange}`">{{ entry.summary.ownItem ? 'Replace your offer' : 'Choose your offer' }}</label>
         <div class="offer-controls"><select :id="`offer-${entry.exchange}`" v-model="selections[entry.exchange]" required><option value="" disabled>Choose a saved card</option><option v-for="card in cards.filter(card => !card.archived)" :key="card.card" :value="card.card">{{ card.label }}</option></select>
         <button class="primary" :disabled="busy || unavailable || !selections[entry.exchange] || selections[entry.exchange] === entry.summary.ownItem">Save offer</button></div>
-        <small v-if="!cards.length">Create a private card above, then select it here.</small>
+        <small v-if="!cards.some(card => !card.archived)">Create a new private card above, then select it here.</small>
       </form>
       <section v-if="entry.summary.status === 'OPEN'" class="approval-panel">
         <h3>Approve this selection</h3>
         <p class="muted">Once you both approve, your card's label and exact links are shared, and Knowbody reads those pages to prepare a source brief for each person. Both can read both briefs while the exchange is active.</p>
         <p v-if="!entry.summary.ownItem || !entry.summary.otherPreview" class="muted">Both people need to offer a card first.</p>
         <template v-else>
-          <div class="approval-status"><span>{{ entry.summary.ownApproved ? '✓ You approved' : 'Your approval needed' }}</span><span>{{ entry.summary.otherApproved ? '✓ They approved' : 'Waiting for their approval' }}</span></div>
           <template v-if="!entry.summary.ownApproved"><label class="consent"><input type="checkbox" :checked="consent[entry.exchange] === entry.summary.revision" @change="consent[entry.exchange] = ($event.target as HTMLInputElement).checked ? entry.summary.revision : null" /><span>I recognize {{ entry.partner?.username }} and agree to share this selection and its source brief.</span></label><button class="primary" :disabled="busy || unavailable || consent[entry.exchange] !== entry.summary.revision" @click="approveExchange(entry)">Approve and share when mutual</button></template>
           <small>Replacing either offer clears both approvals.</small>
         </template>
@@ -192,7 +205,13 @@ onUnmounted(() => {
       </div>
       <details v-if="entry.summary.status === 'ENDED' && entry.ownBrief.report" class="own-brief"><summary>Your retained source brief</summary><SourceBrief :details="entry.ownBrief.details" heading="Your source brief" /></details>
       <p v-if="entry.summary.status === 'ACTIVE'" class="muted">Either person can end shared access. Information already seen or copied cannot be taken back.</p>
-      <div class="exchange-footer"><span class="muted">Selection revision {{ entry.summary.revision }}</span><button v-if="entry.summary.status !== 'ENDED'" class="text-button" :disabled="busy || unavailable" @click="endExchange(entry)">End exchange</button></div>
+      <div v-if="ending === entry.exchange && entry.summary.status !== 'ENDED'" class="approval-panel">
+        <h3>End this exchange?</h3>
+        <p>Both of you lose access through this exchange to the other's card and brief. Unfinished research stops. Your own cards and completed briefs remain. This exchange cannot be reopened.</p>
+        <button class="primary" :disabled="busy || unavailable" @click="endExchange(entry)">End shared access</button>
+        <button class="text-button" :disabled="busy" @click="ending = null">Keep exchange</button>
+      </div>
+      <div class="exchange-footer"><span class="muted">Selection revision {{ entry.summary.revision }}</span><button v-if="entry.summary.status !== 'ENDED' && ending !== entry.exchange" class="text-button" :disabled="busy || unavailable" @click="ending = entry.exchange">End exchange</button></div>
     </article>
   </section>
 </template>

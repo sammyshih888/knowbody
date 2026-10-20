@@ -84,6 +84,12 @@ then Researching.fail (report)
 
 Worker requests return stored, or false when the guard fails. The host blocks their HTTP paths and serializes publication with ending; Researching validates evidence.
 
+The reader checks only the selected URLs and same-host HTTPS redirects. It keeps up to 20 passages per readable page, each limited to 1000 characters, after removing navigation and executable content. LINK records an observed link to another selected readable page. SAME_TEXT compares whole stored passages, ignoring spacing only. PASSAGES pairs the first passages containing work, education, or project keywords, with at most one pair per topic for each pair of pages. Repeated or identical pairs are omitted. These English keyword rules can miss wording and do not establish identity, truth, agreement, or contradiction.
+
+Dates come from recognizable ISO dates in page metadata or time elements in the page body. Invalid calendar dates and placeholder years are omitted; retrieval time is recorded separately. The UI says “Page date not detected” when no usable date was found. It does not claim the page contains no date. Previously completed reports remain unchanged; a new exchange is required to retrieve fresh sources.
+
+Selected URLs that resolve to the same final page retain their original URL provenance but are not paired as separate sources in a finding.
+
 ```endpoints
 Briefing.Get at /reports/get
 Briefing.WorkerWork at /_worker/work

@@ -4,7 +4,7 @@ import { checkServerIdentity } from "node:tls";
 import { isIP } from "node:net";
 import ipaddr from "ipaddr.js";
 import { loadBuffer } from "cheerio";
-import type { FindingData, SourceData } from "../concepts/Researching.ts";
+import { normalizedText, type FindingData, type SourceData } from "../concepts/Researching.ts";
 
 export interface PageResponse { status: number; headers: Record<string, string | undefined>; body: Buffer }
 export interface PageIO {
@@ -13,6 +13,13 @@ export interface PageIO {
 }
 const MAX_BYTES = 1024 * 1024;
 const clean = (value: string) => value.replace(/\s+/g, " ").trim();
+function pageDate(value: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T[\d:.+-]+Z?)?$/.exec(value.trim());
+  if (!match || Number(match[1]) < 1000 || !Number.isFinite(Date.parse(value))) return null;
+  const date = `${match[1]}-${match[2]}-${match[3]}`;
+  // Date.parse accepts impossible dates such as February 30 by rolling into March.
+  return new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date ? date : null;
+}
 export function publicAddress(address: string): boolean {
   try { return ipaddr.process(address).range() === "unicast"; } catch { return false; }
 }
@@ -57,6 +64,11 @@ function bounded<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 interface Extracted { source: SourceData; outgoing: string[] }
+const topics = [
+  { name: "work", terms: /\b(work(?:s|ing)?|employ(?:ed|ment)?|career|job|engineer|designer|developer|founder)\b/i },
+  { name: "education", terms: /\b(school|university|college|stud(?:y|ied|ying)|graduat(?:e|ed)|degree|phd)\b/i },
+  { name: "projects", terms: /\b(projects?|build(?:ing)?|built|created|maintain(?:er|ing)?)\b/i },
+];
 async function readPage(original: string, signal: AbortSignal, io: PageIO): Promise<Extracted> {
   const unavailable = (): Extracted => ({ source: { url: original, outcome: "UNAVAILABLE", title: null, excerpt: "",
     retrievedAt: new Date().toISOString(), pageDate: null, finalUrl: null, linksTo: [] }, outgoing: [] });
@@ -82,8 +94,8 @@ async function readPage(original: string, signal: AbortSignal, io: PageIO): Prom
           ![undefined, "identity"].includes(response.headers["content-encoding"])) return unavailable();
       const $ = loadBuffer(response.body);
       const title = clean($("title").first().text()).slice(0, 200) || null;
-      const pageDate = clean($("meta[property='article:published_time'], meta[name='date'], meta[name='DC.date.issued']").first().attr("content") ??
-        $("time[datetime]").first().attr("datetime") ?? "").slice(0, 80) || null;
+      const suppliedDates = $("meta[property='article:published_time'], meta[name='date'], meta[name='DC.date.issued']")
+        .map((_, element) => $(element).attr("content") ?? "").get();
       let linkBase = url;
       try { linkBase = new URL($("base[href]").first().attr("href") ?? url.href, url); } catch { /* Use the document URL for an invalid base. */ }
       const outgoing = $("a[href]").map((_, element) => {
@@ -92,12 +104,17 @@ async function readPage(original: string, signal: AbortSignal, io: PageIO): Prom
       $("script,style,nav,footer,header,aside,form,noscript,iframe,svg,[hidden],[aria-hidden='true']").remove();
       const main = $("main,article,[role='main']").first();
       const content = main.length ? main : $("body");
+      suppliedDates.push(...content.find("time[datetime], .dt-published[datetime]")
+        .map((_, element) => $(element).attr("datetime") ?? "").get());
+      const detectedDate = suppliedDates.map(pageDate).find(date => date !== null) ?? null;
       const paragraphs = content.find("p").map((_, element) => clean($(element).text())).get().filter(text => text.length >= 40);
       const text = paragraphs.length ? paragraphs.join("\n\n") : clean(content.text());
       if (text.length < 40) return unavailable();
       const excerpt = text.length > 800 ? text.slice(0, 799).trimEnd() + "…" : text;
+      const passages = (paragraphs.length ? paragraphs : [text]).slice(0, 20)
+        .map(paragraph => paragraph.length > 1000 ? paragraph.slice(0, 999).trimEnd() + "…" : paragraph);
       return { source: { url: original, outcome: "READABLE", title, excerpt, retrievedAt: new Date().toISOString(),
-        pageDate, finalUrl: url.href, linksTo: [] }, outgoing };
+        pageDate: detectedDate, finalUrl: url.href, linksTo: [], passages }, outgoing };
     }
   } catch { /* Network, access, parse, and deadline failures have the same neutral outcome. */ }
   return unavailable();
@@ -106,9 +123,31 @@ export async function collectSources(urls: string[], signal: AbortSignal, io: Pa
   const pages = await Promise.all(urls.map(url => readPage(url, signal, io)));
   const readable = pages.filter(page => page.source.outcome === "READABLE");
   for (const page of readable) {
-    page.source.linksTo = readable.filter(other => other !== page && page.outgoing.some(url => url === other.source.url || url === other.source.finalUrl)).map(other => other.source.url);
+    page.source.linksTo = readable.filter(other => other !== page && other.source.finalUrl !== page.source.finalUrl &&
+      page.outgoing.some(url => url === other.source.url || url === other.source.finalUrl)).map(other => other.source.url);
   }
   const findingData: FindingData[] = readable.flatMap(page => page.source.linksTo.map(to => ({ kind: "LINK" as const,
     sourceURLs: [page.source.url, to], explanation: "The first selected page contains a link to the second selected page." })));
+  for (let first = 0; first < readable.length; first++) {
+    for (let second = first + 1; second < readable.length; second++) {
+      const a = readable[first]!.source, b = readable[second]!.source;
+      if (a.finalUrl === b.finalUrl) continue;
+      const match = a.passages!.find(text => b.passages!.some(other => normalizedText(text) === normalizedText(other)));
+      if (match) findingData.push({ kind: "SAME_TEXT", sourceURLs: [a.url, b.url],
+        quotes: [match, b.passages!.find(other => normalizedText(match) === normalizedText(other))!],
+        explanation: "These excerpts have the same wording apart from spacing. This does not establish who wrote it or whether it is true." });
+      const used = new Set<string>();
+      for (const topic of topics) {
+        const firstQuote = a.passages!.find(text => topic.terms.test(text));
+        const secondQuote = b.passages!.find(text => topic.terms.test(text));
+        if (!firstQuote || !secondQuote || normalizedText(firstQuote) === normalizedText(secondQuote)) continue;
+        const pair = JSON.stringify([firstQuote, secondQuote]);
+        if (used.has(pair)) continue;
+        used.add(pair);
+        findingData.push({ kind: "PASSAGES", sourceURLs: [a.url, b.url], quotes: [firstQuote, secondQuote],
+          explanation: `Both excerpts contain words about ${topic.name}. Compare their wording and dates; this does not establish agreement or a contradiction.` });
+      }
+    }
+  }
   return { sourceData: pages.map(page => page.source), findingData };
 }

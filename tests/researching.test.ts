@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, expect, test } from "bun:test";
 import { MongoClient, type Db } from "mongodb";
-import { ResearchingConcept, InvalidResearch, InvalidResearchResult, type SourceData } from "../src/concepts/Researching.ts";
+import { ResearchingConcept, InvalidResearch, InvalidResearchResult, type SourceData, type FindingData } from "../src/concepts/Researching.ts";
 import { SharingConcept } from "../src/concepts/Sharing.ts";
 const client = new MongoClient(process.env.MONGODB_URL!, { serverSelectionTimeoutMS: 3000 });
 let db: Db;
@@ -36,6 +36,34 @@ test("context cancellation prevents late starts and finishes, including concurre
   expect(await research._pending()).toEqual([]);
   expect(await research.finish({ report, sourceData: sources(), findingData: [] })).toEqual({ stored: false });
   await expect(research.start({ owner: "b", context: "race", urls })).rejects.toThrow(InvalidResearch);
+});
+test("comparison evidence must quote the corresponding readable sources and matching text must match", async () => {
+  const research = new ResearchingConcept(db);
+  const report = await research.start({ owner: "a", context: "comparison", urls });
+  const first = "I work as a designer at Acorn and enjoy drawing outside work.";
+  const second = "I work as an engineer at Cedar and enjoy building small projects.";
+  const sourceData = sources().map((source, index) => ({ ...source, passages: [index ? second : first] }));
+  const comparison: FindingData = { kind: "PASSAGES", sourceURLs: urls, quotes: [first, second], explanation: "Work excerpts to compare." };
+  for (const finding of [
+    { ...comparison, quotes: [second, first] },
+    { ...comparison, sourceURLs: [urls[0]!, "https://other.org/"] },
+    { ...comparison, quotes: [first, "Invented wording that does not appear in this source page."] },
+    { ...comparison, kind: "SAME_TEXT" as const },
+    { ...comparison, quotes: undefined },
+  ]) {
+    await expect(research.finish({ ...report, sourceData, findingData: [finding] })).rejects.toThrow(InvalidResearchResult);
+    expect((await research._get(report))[0]?.details).toMatchObject({ status: "PENDING", sources: [], findings: [] });
+  }
+  await expect(research.finish({ ...report, sourceData: sourceData.map(source => ({ ...source, finalUrl: urls[0]! })), findingData: [comparison] }))
+    .rejects.toThrow(InvalidResearchResult);
+  expect((await research._get(report))[0]?.details).toMatchObject({ status: "PENDING", sources: [], findings: [] });
+  expect(await research.finish({ ...report, sourceData, findingData: [comparison] })).toEqual({ stored: true });
+  expect((await new ResearchingConcept(db)._get(report))[0]?.details.findings).toEqual([comparison]);
+  const matching = await research.start({ owner: "a", context: "matching", urls });
+  const repeated = sourceData.map(source => ({ ...source, passages: [first] }));
+  expect(await research.finish({ ...matching, sourceData: repeated, findingData: [
+    { kind: "SAME_TEXT", sourceURLs: urls, quotes: [first, first], explanation: "The wording matches apart from spacing." },
+  ] })).toEqual({ stored: true });
 });
 test("cancelling one report blocks its late result without cancelling another report in the context", async () => {
   const research = new ResearchingConcept(db);

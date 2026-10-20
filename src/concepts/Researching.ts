@@ -7,8 +7,13 @@ export interface SourceData {
   url: string; outcome: "READABLE" | "UNAVAILABLE"; title: string | null;
   excerpt: string; retrievedAt: string; pageDate: string | null; finalUrl: string | null;
   linksTo: string[];
+  passages?: string[];
 }
-export interface FindingData { kind: "LINK"; sourceURLs: string[]; explanation: string }
+export interface FindingData {
+  kind: "LINK" | "SAME_TEXT" | "PASSAGES"; sourceURLs: string[]; explanation: string;
+  quotes?: string[];
+}
+export const normalizedText = (text: string) => text.replace(/\s+/g, " ").trim();
 export interface ReportDetails {
   owner: string; context: string; urls: string[]; status: ReportStatus;
   sources: SourceData[]; findings: FindingData[];
@@ -37,7 +42,7 @@ export class ResearchingConcept {
   async finish({ report, sourceData, findingData }: { report: string; sourceData: SourceData[]; findingData: FindingData[] }): Promise<{ stored: boolean }> {
     const row = (await this._get({ report }))[0]?.details;
     if (!row || row.status !== "PENDING") return { stored: false };
-    const invalid = () => { throw new InvalidResearchResult("Results must describe exactly the saved sources and supported links between them."); };
+    const invalid = () => { throw new InvalidResearchResult("Results must describe exactly the saved sources and supported comparisons between them."); };
     if (!Array.isArray(sourceData) || sourceData.length !== row.urls.length ||
         sourceData.some(source => !source || typeof source !== "object") ||
         new Set(sourceData.map(source => source.url)).size !== row.urls.length) invalid();
@@ -48,7 +53,10 @@ export class ResearchingConcept {
           !(source.title === null || typeof source.title === "string" && source.title.length <= 200) ||
           !(source.pageDate === null || typeof source.pageDate === "string" && source.pageDate.length <= 80) ||
           !Array.isArray(source.linksTo) || source.linksTo.some(url => !row.urls.includes(url) || url === source.url)) invalid();
+      if (source.passages !== undefined && (!Array.isArray(source.passages) || source.passages.length > 20 ||
+          source.passages.some(text => typeof text !== "string" || !text.trim() || text.length > 1000))) invalid();
       if (source.outcome === "UNAVAILABLE" && (source.excerpt !== "" || source.linksTo.length !== 0)) invalid();
+      if (source.outcome === "UNAVAILABLE" && source.passages?.length) invalid();
       if (source.outcome === "READABLE" && !source.excerpt.trim()) invalid();
       if (source.finalUrl !== null) {
         try {
@@ -57,13 +65,21 @@ export class ResearchingConcept {
         } catch { invalid(); }
       }
     }
-    if (!Array.isArray(findingData) || findingData.length > 20) invalid();
+    if (!Array.isArray(findingData) || findingData.length > 60) invalid();
     for (const finding of findingData) {
-      if (!finding || finding.kind !== "LINK" || !Array.isArray(finding.sourceURLs) || finding.sourceURLs.length !== 2 ||
+      if (!finding || !["LINK", "SAME_TEXT", "PASSAGES"].includes(finding.kind) || !Array.isArray(finding.sourceURLs) || finding.sourceURLs.length !== 2 ||
           new Set(finding.sourceURLs).size !== 2 || typeof finding.explanation !== "string" || finding.explanation.length > 300) invalid();
-      const [from, to] = finding.sourceURLs;
-      const source = sourceData.find(source => source.url === from && source.outcome === "READABLE");
-      if (!source?.linksTo.includes(to!) || !sourceData.some(source => source.url === to && source.outcome === "READABLE")) invalid();
+      const evidence = finding.sourceURLs.map(url => sourceData.find(source => source.url === url && source.outcome === "READABLE"));
+      if (evidence.some(source => !source)) invalid();
+      if (evidence[0]!.finalUrl && evidence[0]!.finalUrl === evidence[1]!.finalUrl) invalid();
+      if (finding.kind === "LINK") {
+        if (!evidence[0]?.linksTo.includes(finding.sourceURLs[1]!) || finding.quotes !== undefined) invalid();
+      } else {
+        if (!Array.isArray(finding.quotes) || finding.quotes.length !== 2 || finding.quotes.some((quote, index) =>
+          typeof quote !== "string" || quote.length < 40 || quote.length > 1000 ||
+          !(evidence[index]?.passages ?? [evidence[index]!.excerpt]).includes(quote))) invalid();
+        if (finding.kind === "SAME_TEXT" && normalizedText(finding.quotes![0]!) !== normalizedText(finding.quotes![1]!)) invalid();
+      }
     }
     const result = await this.contexts.updateOne({ cancelled: false, reports: { $elemMatch: { report, status: "PENDING" } } },
       { $set: { "reports.$.status": "READY", "reports.$.sources": sourceData, "reports.$.findings": findingData } });

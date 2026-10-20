@@ -94,7 +94,7 @@ Defined in [Researching](../design/concepts/Researching.md), line 1.
 - `start(owner: User, context: Context, urls: URLs) : returns (report: Report)`
   - Refuses `INVALID_RESEARCH`: Research requires a fixed selection of one to five HTTPS URLs in an open context.
 - `finish(report: Report, sourceData: SourceDataSet, findingData: FindingDataSet) : returns (stored: Flag)`
-  - Refuses `INVALID_RESEARCH_RESULT`: Results must describe exactly the saved sources and supported links between them.
+  - Refuses `INVALID_RESEARCH_RESULT`: Results must describe exactly the saved sources and supported comparisons between them.
 - `fail(report: Report) : returns (stored: Flag)`
 - `cancel(report: Report) : returns ()`
 - `cancelContext(context: Context) : returns ()`
@@ -160,6 +160,10 @@ Defined in [Sharing](../design/concepts/Sharing.md), line 1.
 Concrete types:
 
 - `SharedItem` — [Knowbody application types](../design/types.md), line 6.
+
+## Computations
+
+- `trimQuery(query: String) : String` — [Private cards](../design/compositions/Cards.md), line 14.
 
 ## Views
 
@@ -236,7 +240,7 @@ Authored path: `Exchanges.Approvable`.
 
 Authored path: `Access.Readable`.
 - Covered by [Reading shared material](../design/compositions/Access.md), line 3.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
 
 ```view
 (viewer) can read (item) — inputs (viewer, item); outputs (); bindings (scope)
@@ -249,7 +253,7 @@ Authored path: `Access.Readable`.
 ### (viewer) can read card (item)
 
 Authored path: `Cards.Readable`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
 
 ```view
 (viewer) can read card (item) — inputs (viewer, item); outputs (); bindings ()
@@ -305,7 +309,7 @@ Former "brief owned by (owner) in (exchange) for (viewer)" — inputs (owner, ex
 ### cards owned by (owner)
 
 Authored path: `Cards.CardList`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
 
 ```former
 Former "cards owned by (owner)" — inputs (owner); bindings (card, label, urls, pageTypes, archived); promises exactly one record — forms:
@@ -323,7 +327,7 @@ Former "cards owned by (owner)" — inputs (owner); bindings (card, label, urls,
 ### details for (card)
 
 Authored path: `Cards.CardDetails`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
 
 ```former
 Former "details for (card)" — inputs (card); bindings (label, urls, pageTypes, archived); promises exactly one record — forms:
@@ -588,7 +592,7 @@ then
 
 Authored path: `Briefing.Get`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 41.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 88.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 94.
 
 ```reaction
 when RequestBoundary.request (path: "/reports/get", report, requestId, session)
@@ -600,7 +604,7 @@ then
 
 Authored path: `Briefing.Get`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 41.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 88.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 94.
 
 ```reaction
 when Sessioning.current (session, subject: viewer), asked by Briefing.Get
@@ -615,7 +619,7 @@ then
 
 Authored path: `Briefing.Get`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 41.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 88.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 94.
 
 ```reaction
 when Sessioning.current (session, subject: viewer), asked by Briefing.Get
@@ -702,7 +706,7 @@ then
 
 Authored path: `Briefing.WorkerFailure`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 71.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 92.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 98.
 
 ```reaction
 when RequestBoundary.request (path: "/_worker/failure", report, requestId)
@@ -716,7 +720,7 @@ then
 
 Authored path: `Briefing.WorkerFailure`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 71.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 92.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 98.
 
 ```reaction
 when Researching.fail (report, stored), asked by Briefing.WorkerFailure:fail
@@ -730,7 +734,7 @@ then
 
 Authored path: `Briefing.WorkerFailure`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 71.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 92.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 98.
 
 ```reaction
 when RequestBoundary.request (path: "/_worker/failure", report, requestId)
@@ -744,7 +748,7 @@ then
 
 Authored path: `Briefing.WorkerRecover`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 69.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 90.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 96.
 
 ```reaction
 when RequestBoundary.request (exchange, path: "/_worker/recover", requestId)
@@ -756,7 +760,7 @@ then
 
 Authored path: `Briefing.WorkerRecover`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 69.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 90.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 96.
 
 ```reaction
 when Exchanging.synchronize (exchange), asked by Briefing.WorkerRecover
@@ -771,7 +775,7 @@ then
 
 Authored path: `Briefing.WorkerResult`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 71.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 91.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 97.
 
 ```reaction
 when RequestBoundary.request (findingData, path: "/_worker/result", report, requestId, sourceData)
@@ -785,7 +789,7 @@ then
 
 Authored path: `Briefing.WorkerResult`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 71.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 91.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 97.
 
 ```reaction
 when RequestBoundary.request (findingData, path: "/_worker/result", report, requestId, sourceData)
@@ -799,7 +803,7 @@ then
 
 Authored path: `Briefing.WorkerResult`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 71.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 91.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 97.
 
 ```reaction
 when Researching.finish (findingData, report, sourceData, stored), asked by Briefing.WorkerResult:publish
@@ -813,7 +817,7 @@ then
 
 Authored path: `Briefing.WorkerWork`.
 - Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 54.
-- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 89.
+- Covered by [Reciprocal sharing and source briefs](../design/compositions/Briefing.md), line 95.
 
 ```reaction
 when RequestBoundary.request (path: "/_worker/work", requestId)
@@ -821,11 +825,51 @@ then
   RequestBoundary.respond (requestId, work: former "source brief work")
 ```
 
+### Cards.Archive
+
+Authored path: `Cards.Archive`.
+- Covered by [Private cards](../design/compositions/Cards.md), line 53.
+- Covered by [Private cards](../design/compositions/Cards.md), line 65.
+
+```reaction
+when RequestBoundary.request (card, path: "/cards/archive", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### Cards.Archive#2
+
+Authored path: `Cards.Archive`.
+- Covered by [Private cards](../design/compositions/Cards.md), line 53.
+- Covered by [Private cards](../design/compositions/Cards.md), line 65.
+
+```reaction
+when Sessioning.current (session, subject: owner), asked by Cards.Archive
+where
+  earlier, RequestBoundary.request (card, path: "/cards/archive", requestId, session)
+then
+  Collecting.archive (card, owner)
+```
+
+### Cards.Archive#3
+
+Authored path: `Cards.Archive`.
+- Covered by [Private cards](../design/compositions/Cards.md), line 53.
+- Covered by [Private cards](../design/compositions/Cards.md), line 65.
+
+```reaction
+when Collecting.archive (card, owner), asked by Cards.Archive#2
+where
+  earlier, RequestBoundary.request (card, path: "/cards/archive", requestId, session)
+then
+  RequestBoundary.respond (card, requestId)
+```
+
 ### Cards.Create
 
 Authored path: `Cards.Create`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 3.
-- Covered by [Private cards](../design/compositions/Cards.md), line 30.
+- Covered by [Private cards](../design/compositions/Cards.md), line 18.
+- Covered by [Private cards](../design/compositions/Cards.md), line 62.
 
 ```reaction
 when RequestBoundary.request (label, pageTypes, path: "/cards/create", requestId, session, urls)
@@ -836,8 +880,8 @@ then
 ### Cards.Create#2
 
 Authored path: `Cards.Create`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 3.
-- Covered by [Private cards](../design/compositions/Cards.md), line 30.
+- Covered by [Private cards](../design/compositions/Cards.md), line 18.
+- Covered by [Private cards](../design/compositions/Cards.md), line 62.
 
 ```reaction
 when Sessioning.current (session, subject: owner), asked by Cards.Create
@@ -850,8 +894,8 @@ then
 ### Cards.Create:registered#3
 
 Authored path: `Cards.Create`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 3.
-- Covered by [Private cards](../design/compositions/Cards.md), line 30.
+- Covered by [Private cards](../design/compositions/Cards.md), line 18.
+- Covered by [Private cards](../design/compositions/Cards.md), line 62.
 
 ```reaction
 when Collecting.create (label, owner, pageTypes, urls, card), asked by Cards.Create#2
@@ -866,8 +910,8 @@ then
 ### Cards.Create:unregistered#3
 
 Authored path: `Cards.Create`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 3.
-- Covered by [Private cards](../design/compositions/Cards.md), line 30.
+- Covered by [Private cards](../design/compositions/Cards.md), line 18.
+- Covered by [Private cards](../design/compositions/Cards.md), line 62.
 
 ```reaction
 when Collecting.create (label, owner, pageTypes, urls, card), asked by Cards.Create#2
@@ -882,8 +926,8 @@ then
 ### Cards.Get
 
 Authored path: `Cards.Get`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
-- Covered by [Private cards](../design/compositions/Cards.md), line 32.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
+- Covered by [Private cards](../design/compositions/Cards.md), line 64.
 
 ```reaction
 when RequestBoundary.request (card, path: "/cards/get", requestId, session)
@@ -894,11 +938,12 @@ then
 ### Cards.Get:inaccessible#2
 
 Authored path: `Cards.Get`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
-- Covered by [Private cards](../design/compositions/Cards.md), line 32.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
+- Covered by [Private cards](../design/compositions/Cards.md), line 64.
 
 ```reaction
 when Sessioning.current (session, subject: viewer), asked by Cards.Get
+at the flow's settlement frontier
 where
   earlier, RequestBoundary.request (card, path: "/cards/get", requestId, session)
   no view "(viewer) can read card (item)" with (item: card, viewer)
@@ -909,11 +954,12 @@ then
 ### Cards.Get:readable#2
 
 Authored path: `Cards.Get`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
-- Covered by [Private cards](../design/compositions/Cards.md), line 32.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
+- Covered by [Private cards](../design/compositions/Cards.md), line 64.
 
 ```reaction
 when Sessioning.current (session, subject: viewer), asked by Cards.Get
+at the flow's settlement frontier
 where
   earlier, RequestBoundary.request (card, path: "/cards/get", requestId, session)
   view "(viewer) can read card (item)" with (item: card, viewer)
@@ -924,8 +970,8 @@ then
 ### Cards.List
 
 Authored path: `Cards.List`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
-- Covered by [Private cards](../design/compositions/Cards.md), line 31.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
+- Covered by [Private cards](../design/compositions/Cards.md), line 63.
 
 ```reaction
 when RequestBoundary.request (path: "/cards/list", requestId, session)
@@ -936,11 +982,12 @@ then
 ### Cards.List#2
 
 Authored path: `Cards.List`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 13.
-- Covered by [Private cards](../design/compositions/Cards.md), line 31.
+- Covered by [Private cards](../design/compositions/Cards.md), line 37.
+- Covered by [Private cards](../design/compositions/Cards.md), line 63.
 
 ```reaction
 when Sessioning.current (session, subject: owner), asked by Cards.List
+at the flow's settlement frontier
 where
   earlier, RequestBoundary.request (path: "/cards/list", requestId, session)
 then
@@ -950,10 +997,24 @@ then
 ### Cards.RegisterOwnership
 
 Authored path: `Cards.RegisterOwnership`.
-- Covered by [Private cards](../design/compositions/Cards.md), line 3.
+- Covered by [Private cards](../design/compositions/Cards.md), line 18.
 
 ```reaction
 when Collecting.create (owner, card)
+then
+  Sharing.register (item: card, owner)
+```
+
+### Cards.RepairOwnership
+
+Authored path: `Cards.RepairOwnership`.
+- Covered by [Private cards](../design/compositions/Cards.md), line 28.
+
+```reaction
+when Sessioning.current (subject: owner)
+where
+  Collecting._byOwner (owner) has (card)
+  Sharing._owned (item: card, viewer: owner) has (owned: false)
 then
   Sharing.register (item: card, owner)
 ```
@@ -976,6 +1037,33 @@ where
   earlier, RequestBoundary.request (requestId)
 then
   RequestBoundary.respond (error: message, requestId)
+```
+
+### Discovery.Authorize
+
+Authored path: `Discovery.Authorize`.
+- Covered by [Private cards](../design/compositions/Cards.md), line 3.
+- Covered by [Private cards](../design/compositions/Cards.md), line 66.
+
+```reaction
+when RequestBoundary.request (path: "/_discovery/authorize", query, requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### Discovery.Authorize#2
+
+Authored path: `Discovery.Authorize`.
+- Covered by [Private cards](../design/compositions/Cards.md), line 3.
+- Covered by [Private cards](../design/compositions/Cards.md), line 66.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by Discovery.Authorize
+where
+  earlier, RequestBoundary.request (path: "/_discovery/authorize", query, requestId, session)
+  trimmed is trimQuery (query)
+then
+  RequestBoundary.respond (query: trimmed, requestId, user)
 ```
 
 ### Exchanges.Approve
@@ -1262,6 +1350,7 @@ object or lacks a required key. The response uses `INVALID_INPUT` and names
 the path or missing key. A declared default fills an absent key. Endpoints
 not listed here have no explicit input contract.
 
+- `/_discovery/authorize` — requires `session`, `query`
 - `/_worker/failure` — requires `report`
 - `/_worker/recover` — requires `exchange`
 - `/_worker/result` — requires `report`, `sourceData`, `findingData`
@@ -1269,6 +1358,7 @@ not listed here have no explicit input contract.
 - `/auth/register` — requires `username`, `password`
 - `/auth/sign-in` — requires `username`, `password`
 - `/auth/sign-out` — requires `session`
+- `/cards/archive` — requires `session`, `card`
 - `/cards/create` — requires `session`, `label`, `urls`, `pageTypes`
 - `/cards/get` — requires `session`, `card`
 - `/cards/list` — requires `session`

@@ -7,6 +7,10 @@ import { createCardInput, getCardInput, sessionInput } from "./validators.ts";
 const { Collecting, Sessioning, Sharing } = concepts;
 const RegisterOwnership = reaction(({ owner, card }) =>
   when(Collecting.create({ owner }).responds({ card })).then(Sharing.register({ owner, item: card })));
+const RepairOwnership = reaction(({ owner, card }) =>
+  when(Sessioning.current({}).responds({ subject: owner }))
+    .where(Collecting._byOwner({ owner }).is({ card }), Sharing._owned({ viewer: owner, item: card }).is({ owned: false }))
+    .then(Sharing.register({ owner, item: card })));
 const Readable = view("(viewer) can read card (item)", ({ viewer, item }) =>
   where(AccessReadable({ viewer, item }), Collecting._get({ card: item }).is({}))).holds();
 const CardList = former("cards owned by (owner)", ({ owner }, { card, label, urls, pageTypes, archived }) =>
@@ -28,15 +32,23 @@ const Create = endpoint("/cards/create", ({ session, owner, label, urls, pageTyp
 const List = endpoint("/cards/list", ({ session, owner }) =>
   receive({ session })
     .then(Sessioning.current({ session }).responds({ subject: owner }))
+    .afterFlowSettles()
     .then(respond({ collection: CardList({ owner }) })),
   { input: { required: ["session"] }, validators: { input: sessionInput } });
 const Get = endpoint("/cards/get", ({ session, viewer, card }) =>
   receive({ session, card })
     .then(Sessioning.current({ session }).responds({ subject: viewer }))
+    .afterFlowSettles()
     .then(
       where(Readable({ viewer, item: card })).then(respond({ details: CardDetails({ card }) })).named("readable"),
       where(no(Readable({ viewer, item: card })))
         .then(respond({ error: "CARD_UNAVAILABLE" })).named("inaccessible"),
     ),
   { input: { required: ["session", "card"] }, validators: { input: getCardInput } });
-export const composition = { RegisterOwnership, Readable, CardList, CardDetails, Create, List, Get };
+const Archive = endpoint("/cards/archive", ({ session, owner, card }) =>
+  receive({ session, card })
+    .then(Sessioning.current({ session }).responds({ subject: owner }))
+    .then(Collecting.archive({ owner, card }))
+    .then(respond({ card })),
+  { input: { required: ["session", "card"] }, validators: { input: getCardInput } });
+export const composition = { RegisterOwnership, RepairOwnership, Readable, CardList, CardDetails, Create, List, Get, Archive };

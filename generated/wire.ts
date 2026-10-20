@@ -14,6 +14,17 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 export type AppWideError = never;
 
 export type KnowbodyWire = {
+  "/_discovery/authorize": {
+    input: {
+      "query": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["trimQuery"]["fn"]>[0], ["query"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "query": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["trimQuery"]["fn"]>>, []>>;
+      "user": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>>, ["subject"]>>;
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
+  };
   "/_worker/failure": {
     input: {
       "report": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Researching"]["fail"]>[0], ["report"]>>;
@@ -70,7 +81,7 @@ export type KnowbodyWire = {
       "user": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>>, ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Authenticating"]["_get"]>[0], ["user"]>]>>;
       "username": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Authenticating"]["_get"]>>>, ["username"]>>;
     };
-    error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "INVALID_INPUT" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
   };
   "/auth/register": {
     input: {
@@ -103,6 +114,16 @@ export type KnowbodyWire = {
     };
     error: { error: AppWideError | "INVALID_INPUT" };
   };
+  "/cards/archive": {
+    input: {
+      "card": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Collecting"]["archive"]>[0], ["card"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "card": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Collecting"]["archive"]>[0], ["card"]>>;
+    };
+    error: { error: AppWideError | "CARD_NOT_OWNED" | "INVALID_INPUT" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
+  };
   "/cards/create": {
     input: {
       "label": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Collecting"]["create"]>[0], ["label"]>>;
@@ -129,7 +150,7 @@ export type KnowbodyWire = {
         "urls": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Collecting"]["_get"]>>>, ["urls"]>>;
       };
     };
-    error: { error: AppWideError | "CARD_UNAVAILABLE" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "CARD_UNAVAILABLE" | "INVALID_INPUT" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
   };
   "/cards/list": {
     input: {
@@ -146,7 +167,7 @@ export type KnowbodyWire = {
         }[];
       };
     };
-    error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "INVALID_INPUT" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
   };
   "/exchanges/approve": {
     input: {
@@ -168,7 +189,7 @@ export type KnowbodyWire = {
     output: {
       "exchange": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Exchanging"]["end"]>[0], ["exchange"]>>;
     };
-    error: { error: AppWideError | "END_UNAVAILABLE" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "END_UNAVAILABLE" | "INVALID_INPUT" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
   };
   "/exchanges/invite": {
     input: {
@@ -179,7 +200,7 @@ export type KnowbodyWire = {
       "exchange": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Exchanging"]["open"]>>, ["exchange"]>>;
       "invitation": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Exchanging"]["open"]>>, ["invitation"]>>;
     };
-    error: { error: AppWideError | "CARD_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_INVITATION" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "CARD_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_INVITATION" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
   };
   "/exchanges/join": {
     input: {
@@ -189,7 +210,7 @@ export type KnowbodyWire = {
     output: {
       "exchange": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Exchanging"]["join"]>>, ["exchange"]>>;
     };
-    error: { error: AppWideError | "INVALID_INPUT" | "INVITATION_UNAVAILABLE" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "INVALID_INPUT" | "INVITATION_UNAVAILABLE" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
   };
   "/exchanges/list": {
     input: {
@@ -220,7 +241,7 @@ export type KnowbodyWire = {
         })[];
       };
     };
-    error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "INVALID_INPUT" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
   };
   "/exchanges/offer": {
     input: {
@@ -233,7 +254,7 @@ export type KnowbodyWire = {
       "exchange": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Exchanging"]["offer"]>[0], ["exchange"]>>;
       "revision": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Exchanging"]["offer"]>>, ["revision"]>>;
     };
-    error: { error: AppWideError | "CARD_UNAVAILABLE" | "INVALID_INPUT" | "OFFER_UNAVAILABLE" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "CARD_UNAVAILABLE" | "INVALID_INPUT" | "ITEM_REGISTERED" | "OFFER_UNAVAILABLE" | "UNKNOWN_SESSION" };
   };
   "/reports/get": {
     input: {
@@ -245,13 +266,23 @@ export type KnowbodyWire = {
         "details": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Researching"]["_get"]>>>, ["details"]>>;
       };
     };
-    error: { error: AppWideError | "INVALID_INPUT" | "REPORT_UNAVAILABLE" | "UNKNOWN_SESSION" };
+    error: { error: AppWideError | "INVALID_INPUT" | "ITEM_REGISTERED" | "REPORT_UNAVAILABLE" | "UNKNOWN_SESSION" };
   };
 };
 
 export type HttpAppWideError = never;
 
 export type KnowbodyWireHttp = {
+  "/_discovery/authorize": {
+    input: {
+      "query": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["trimQuery"]["fn"]>[0], ["query"]>>;
+    };
+    output: {
+      "query": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["trimQuery"]["fn"]>>, []>>;
+      "user": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>>, ["subject"]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
   "/_worker/failure": {
     input: {
       "report": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Researching"]["fail"]>[0], ["report"]>>;
@@ -306,7 +337,7 @@ export type KnowbodyWireHttp = {
       "user": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>>, ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Authenticating"]["_get"]>[0], ["user"]>]>>;
       "username": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Authenticating"]["_get"]>>>, ["username"]>>;
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/auth/register": {
     input: {
@@ -335,6 +366,15 @@ export type KnowbodyWireHttp = {
     };
     error: { error: HttpAppWideError | "INVALID_REQUEST" };
   };
+  "/cards/archive": {
+    input: {
+      "card": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Collecting"]["archive"]>[0], ["card"]>>;
+    };
+    output: {
+      "card": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Collecting"]["archive"]>[0], ["card"]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
   "/cards/create": {
     input: {
       "label": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Collecting"]["create"]>[0], ["label"]>>;
@@ -359,7 +399,7 @@ export type KnowbodyWireHttp = {
         "urls": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Collecting"]["_get"]>>>, ["urls"]>>;
       };
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
   "/cards/list": {
     input: Record<string, never>;
@@ -374,7 +414,7 @@ export type KnowbodyWireHttp = {
         }[];
       };
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/exchanges/approve": {
     input: {
@@ -404,7 +444,7 @@ export type KnowbodyWireHttp = {
       "exchange": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Exchanging"]["open"]>>, ["exchange"]>>;
       "invitation": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Exchanging"]["open"]>>, ["invitation"]>>;
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
   "/exchanges/join": {
     input: {
@@ -442,7 +482,7 @@ export type KnowbodyWireHttp = {
         })[];
       };
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/exchanges/offer": {
     input: {
@@ -465,6 +505,6 @@ export type KnowbodyWireHttp = {
         "details": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Researching"]["_get"]>>>, ["details"]>>;
       };
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
 };

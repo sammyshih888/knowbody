@@ -25,5 +25,5 @@ export const applicationConceptSet = conceptSet({
     INVALID_INVITATION: InvalidInvitation, INVITATION_UNAVAILABLE: InvitationUnavailable,
     OFFER_UNAVAILABLE: OfferUnavailable, APPROVAL_UNAVAILABLE: ApprovalUnavailable, END_UNAVAILABLE: EndUnavailable,
   } }),
-});
-export const { concepts } = applicationConceptSet;
+}, { trimQuery: ({ query }: { query: string }): string => query.trim() });
+export const { concepts, computations } = applicationConceptSet;

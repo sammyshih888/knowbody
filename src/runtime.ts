@@ -4,16 +4,19 @@ import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { assembleApplication } from "./assembly.ts";
 import { policy } from "./http.ts";
 import { collectSources } from "./research/pages.ts";
+import { searchPages } from "./discovery.ts";
 import type { Db } from "mongodb";
 import type { KnowbodyWire } from "../generated/wire.ts";
 
-export function createRuntime(database: Db, collect = collectSources) {
+export function createRuntime(database: Db, collect = collectSources, search = searchPages) {
   const application = assembleApplication(database);
   const gateway = createGateway({ application });
   const worker = createLocalClient<KnowbodyWire>({ invoker: gateway });
   const handler = createHttpHandler({ application, gateway, policy, responseHeaders: { "X-Content-Type-Options": "nosniff" } });
   const publicPaths = new Set(Object.keys(application.publicInterface.routes)
-    .filter(path => !path.startsWith("/_worker/")).map(path => `${policy.basePath ?? ""}${path}`));
+    .filter(path => !path.startsWith("/_worker/") && !path.startsWith("/_discovery/"))
+    .map(path => `${policy.basePath ?? ""}${path}`));
+  const searches = new Map<string, number>();
   let tail: Promise<unknown> = Promise.resolve();
   let stopped = false;
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -68,6 +71,25 @@ export function createRuntime(database: Db, collect = collectSources) {
   return {
     application, gateway,
     async handle(request: Request) {
+      if (new URL(request.url).pathname === `${policy.basePath}/search`) {
+        const url = new URL(request.url);
+        url.pathname = `${policy.basePath}/_discovery/authorize`;
+        // The standard adapter still validates origin, cookies, method, body, and query.
+        const authorized = await exclusive(() => handler(new Request(url, request)));
+        if (!authorized.ok) { authorized.headers.set("Cache-Control", "no-store"); return authorized; }
+        const { user, query } = await authorized.json() as { user: string; query: string };
+        const now = Date.now();
+        for (const [owner, expiry] of searches) if (expiry <= now) searches.delete(owner);
+        let result;
+        if (searches.has(user)) result = { error: "SEARCH_LIMIT" };
+        else {
+          searches.set(user, now + 5000);
+          // External search does not hold the queue used to end exchanges.
+          result = await search(query, request.signal);
+        }
+        return Response.json(result, { status: "error" in result ? result.error === "SEARCH_LIMIT" ? 429 : 503 : 200,
+          headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+      }
       // Accept only canonical public paths, including before the adapter decodes URLs.
       // Internal worker boundaries must stay unreachable even with a valid user cookie.
       if (!publicPaths.has(new URL(request.url).pathname))

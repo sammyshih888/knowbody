@@ -31,6 +31,7 @@
     "db:down": "docker compose stop mongo",
     "db:logs": "docker compose logs mongo",
     "test": "bun test",
-    "build": "vite build"
+    "build": "vite build",
+    "preview": "bun run db:up && bun run build && NODE_ENV=production PORT=3000 PUBLIC_ORIGIN=http://127.0.0.1:3000 bun run start"
   }
 }

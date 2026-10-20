@@ -12,6 +12,7 @@ import { composition as Briefing } from "./compositions/Briefing.ts";
 import { composition as Accounts } from "./compositions/Accounts.ts";
 import { composition as Cards } from "./compositions/Cards.ts";
 import { composition as Exchanges } from "./compositions/Exchanges.ts";
+import { composition as Discovery } from "./compositions/Discovery.ts";
 import { db } from "./db.ts";
 
 export function assembleApplication(database: Db = db) {
@@ -25,7 +26,7 @@ export function assembleApplication(database: Db = db) {
       Exchanging: new ExchangingConcept(database),
       Researching: new ResearchingConcept(database),
     },
-    composition: { Accounts, Cards, Exchanges, Access, Briefing },
+    composition: { Accounts, Cards, Exchanges, Access, Briefing, Discovery },
     queryCache: "none",
     executionLimits: { maxActiveRootFlows: 100, maxPendingRequests: 100, maxRowsPerEvaluation: 1000,
       maxRequestDurationMs: 10000, maxActionsPerFlow: 50, maxFiringsPerFlow: 50 },

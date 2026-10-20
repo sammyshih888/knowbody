@@ -109,6 +109,32 @@ test("ending during research prevents late publication while independent active 
   expect((await post("/cards/get", { card: b.card }, a.cookie)).status).toBe(404);
 }, 25000);
 
+test("only owners can archive; archiving blocks new approvals but preserves active exchanges", async () => {
+  const a = await account("Christie"), b = await account("Alex");
+  const active = await pair(a, b), pending = await pair(a, b);
+  await approve(a.cookie, active); await approve(b.cookie, active);
+  expect((await post("/cards/archive", { card: a.card })).status).toBe(401);
+  expect((await post("/cards/archive", { card: a.card }, b.cookie)).status).toBe(403);
+  expect((await post("/cards/archive", { card: "unknown" }, a.cookie)).status).toBe(403);
+  expect((await post("/cards/archive", { card: a.card, owner: a.user }, b.cookie)).status).toBe(400);
+  expect((await post("/cards/get", { card: a.card }, a.cookie)).body.details.archived).toBe(false);
+  expect((await post("/cards/archive", { card: a.card }, a.cookie)).body).toEqual({ card: a.card });
+  expect((await post("/cards/archive", { card: a.card }, a.cookie)).status).toBe(200);
+  expect((await post("/exchanges/invite", { card: a.card }, a.cookie)).status).toBe(404);
+  expect((await approve(b.cookie, pending)).status).toBe(409);
+  expect((await list(b.cookie, pending)).summary).toMatchObject({ status: "OPEN", ownApproved: false });
+  expect((await list(b.cookie, active)).shared.card).toBe(a.card);
+  await runtime.stop();
+  runtime = createRuntime(db, async urls => resultFor(urls));
+  expect((await post("/cards/list", {}, a.cookie)).body.collection.cards).toMatchObject([{ card: a.card, archived: true }]);
+  await runtime.tick(); await runtime.idle();
+  expect((await list(b.cookie, active)).shared.brief.details.status).toBe("READY");
+  expect((await post("/cards/get", { card: a.card }, b.cookie)).status).toBe(200);
+  await post("/exchanges/end", { exchange: active }, a.cookie);
+  expect((await post("/cards/get", { card: a.card }, b.cookie)).status).toBe(404);
+  expect((await post("/cards/get", { card: a.card }, a.cookie)).status).toBe(200);
+}, 25000);
+
 test("startup repairs partial activation and cleanup, and reads deny a stale grant immediately", async () => {
   const a = await account("Christie"), b = await account("Alex");
   const exchange = await pair(a,b);
@@ -275,7 +301,8 @@ test("a source worker failure goes through composition and leaves a terminal fai
   } finally { logged.mockRestore(); }
 }, 25000);
 
-test("card creation answers with a private error when ownership registration is missing", async () => {
+test("a missing card registration stays private and is repaired when its owner returns", async () => {
+  const other = await account("Alex");
   await post("/auth/register", { username: "Christie", password: "test-passphrase" });
   const cookie = (await post("/auth/sign-in", { username: "Christie", password: "test-passphrase" })).cookie;
   await runtime.stop();
@@ -286,7 +313,18 @@ test("card creation answers with a private error when ownership registration is 
     const response = await post("/cards/create", { label: "Pages", urls: ["https://www.mit.edu/"], pageTypes: ["Organization page"] }, cookie);
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: "INTERNAL_ERROR" });
-    expect(await db.collection("collecting.cards").countDocuments()).toBe(1);
+    expect(await db.collection("collecting.cards").countDocuments()).toBe(2);
     expect((await post("/cards/list", {}, cookie)).body.collection.cards).toEqual([]);
   } finally { registration.mockRestore(); }
+  await runtime.stop();
+  runtime = createRuntime(db);
+  expect((await post("/cards/list", {}, other.cookie)).body.collection.cards).toHaveLength(1);
+  expect(await db.collection("sharing.items").countDocuments()).toBe(1);
+  const recovered = (await post("/cards/list", {}, cookie)).body.collection.cards;
+  expect(recovered).toHaveLength(1);
+  expect(recovered[0]).toMatchObject({ label: "Pages", urls: ["https://www.mit.edu/"] });
+  expect((await post("/cards/get", { card: recovered[0].card }, other.cookie)).status).toBe(404);
+  expect((await post("/cards/list", {}, cookie)).body.collection.cards).toEqual(recovered);
+  expect(await db.collection("collecting.cards").countDocuments()).toBe(2);
+  expect(await db.collection("sharing.items").countDocuments()).toBe(2);
 }, 25000);

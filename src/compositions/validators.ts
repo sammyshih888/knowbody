@@ -14,6 +14,8 @@ export const credentialsInput = input(["username", "password"], value =>
   typeof value.username === "string" && value.username.length <= 32 &&
   typeof value.password === "string" && value.password.length <= 128);
 export const sessionInput = input(["session"], value => session(value.session));
+export const searchInput = input(["session", "query"], value => session(value.session) &&
+  typeof value.query === "string" && value.query.trim().length > 0 && value.query.length <= 160);
 export const createCardInput = input(["session", "label", "urls", "pageTypes"], value =>
   session(value.session) && typeof value.label === "string" && value.label.length <= 80 &&
   Array.isArray(value.urls) && value.urls.length <= 5 && value.urls.every(url => typeof url === "string" && url.length <= 2048) &&
@@ -34,4 +36,4 @@ export const workerFailureInput = input(["report"], value => identity(value.repo
 export const workerRecoveryInput = input(["exchange"], value => identity(value.exchange));
 export const workerResultInput = input(["report", "sourceData", "findingData"], value => identity(value.report) &&
   Array.isArray(value.sourceData) && value.sourceData.length >= 1 && value.sourceData.length <= 5 &&
-  value.sourceData.every(record) && Array.isArray(value.findingData) && value.findingData.length <= 20 && value.findingData.every(record));
+  value.sourceData.every(record) && Array.isArray(value.findingData) && value.findingData.length <= 60 && value.findingData.every(record));

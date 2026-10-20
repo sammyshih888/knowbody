@@ -1,0 +1,66 @@
+bun test v1.4.2 (744846f84)
+
+tests/briefing-http.test.ts:
+(pass) mutual approval gates cards and briefs; offer changes reset consent; ending preserves only owner reports [816.86ms]
+(pass) ending during research prevents late publication while independent active scopes still grant cards [519.20ms]
+(pass) only owners can archive; archiving blocks new approvals but preserves active exchanges [544.68ms]
+(pass) startup repairs partial activation and cleanup, and reads deny a stale grant immediately [445.76ms]
+(pass) worker discovery retries incomplete sharing and excludes ended reports before cleanup [506.90ms]
+(pass) worker scheduling limits concurrent fetches and aborts work after ending [494.37ms]
+(pass) worker composition accepts pending active reports and ignores terminal, unknown, or ended reports [486.32ms]
+(pass) HTTP cannot reach worker boundaries even with an owner's cookie or encoded paths [439.70ms]
+(pass) a source worker failure goes through composition and leaves a terminal failed brief [587.45ms]
+(pass) a missing card registration stays private and is repaired when its owner returns [441.20ms]
+
+tests/discovery.test.ts:
+(pass) search uses basic requests, filters candidates, and never returns the API key or an AI answer [17.75ms]
+(pass) missing keys, quota exhaustion, and failed providers do not invoke a paid fallback or expose errors [1.29ms]
+(pass) discovery authenticates and validates before searching, keeps candidates unsaved, and limits repeated requests [196.94ms]
+(pass) a slow search does not hold the state-change queue [177.07ms]
+
+tests/knowbody.test.ts:
+(pass) Authenticating > registers, persists a hash, and authenticates after reconstruction [217.64ms]
+(pass) Authenticating > a unique database index rejects concurrent duplicate usernames [123.28ms]
+(pass) Authenticating > refuses empty credentials and invalid usernames without creating users [2.18ms]
+(pass) Collecting > saves fixed selections, isolates owner queries, and archives without changing links [19.10ms]
+(pass) Collecting > rejects invalid URLs and duplicate normalized pages [0.94ms]
+(pass) Sharing > revoking one scope preserves another and the owner's access [21.74ms]
+(pass) Sharing > ownership cannot be replaced and nonowners cannot grant access [8.60ms]
+(pass) Sessioning > sessions persist, expire on time, and end independently [15.51ms]
+(pass) HTTP composition > empty database to private card, restart, second account, and sign-out [375.62ms]
+
+tests/research-pages.test.ts:
+(pass) source dates reject placeholders and invalid calendars, and never substitute retrieval time [29.26ms]
+(pass) source excerpts strip executable text and cite only direct links between selected readable pages [1.07ms]
+(pass) same-host redirects retain provenance; other hosts, protocols, credentials, and ports are never fetched [0.46ms]
+(pass) selected URLs resolving to the same page are not treated as independent comparisons [0.45ms]
+(pass) a document base changes relative link targets without fetching that base or unselected pages [0.36ms]
+(pass) matching wording preserves case and punctuation and requires a substantial exact excerpt [1.22ms]
+(pass) topic comparisons quote differing passages without calling them contradictions or fetching more pages [0.42ms]
+(pass) rejects private, reserved, mixed DNS answers and validates again after a redirect [0.55ms]
+(pass) redirect loops, non-HTML, oversized, empty, unavailable and cancelled pages give neutral outcomes [0.49ms]
+
+tests/researching.test.ts:
+(pass) reports resume once per owner and context, validate evidence, and preserve terminal results [69.02ms]
+(pass) context cancellation prevents late starts and finishes, including concurrent races [14.18ms]
+(pass) comparison evidence must quote the corresponding readable sources and matching text must match [16.50ms]
+(pass) cancelling one report blocks its late result without cancelling another report in the context [11.92ms]
+(pass) an unavailable page allows partial results but cannot support a finding [11.99ms]
+(pass) scope tombstones block late and racing grants while other scopes remain usable [64.15ms]
+
+tests/exchanges-http.test.ts:
+(pass) page types are fixed, match the URLs, and never contain free-form preview text [13.32ms]
+(pass) three accounts can invite, join, and offer without revealing private selections [581.41ms]
+
+tests/exchanging.test.ts:
+(pass) Exchanging > empty state through joining, changed offers, mutual approval, persistence, and ending [29.81ms]
+(pass) Exchanging > only one account can claim an invitation, including concurrent joins [18.95ms]
+(pass) Exchanging > concurrent offers cannot both replace the same revision [13.11ms]
+(pass) Exchanging > concurrent approvals activate once; duplicate approval alone never activates [20.25ms]
+(pass) Exchanging > racing approval against offer change cannot approve a new selection [15.59ms]
+(pass) Exchanging > ending an unclaimed invitation prevents later joining or offer changes [16.66ms]
+
+ 46 pass
+ 0 fail
+ 473 expect() calls
+Ran 46 tests across 7 files. [7.72s]

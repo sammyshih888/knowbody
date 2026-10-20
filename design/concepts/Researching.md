@@ -18,13 +18,13 @@ external Context
 Status is PENDING or READY or FAILED or CANCELLED
 SourceStatus is READABLE or UNAVAILABLE
 opaque Kind
-  A finding category. Only LINK is accepted in this increment.
+  A finding category: LINK, SAME_TEXT, or PASSAGES.
 opaque URLs
   An ordered array of one to five distinct HTTPS URLs.
 opaque SourceDataSet
-  An array supplying the Sources fields except report. Optional values use null. The worker supplies excerpts from retrieved text and linksTo from observed links to other selected pages.
+  An array supplying the Sources fields except report. Optional values use null. The worker supplies excerpts and up to 20 passages from retrieved text, each at most 1000 characters, and linksTo from observed links to other selected pages. Older reports may omit passages.
 opaque FindingDataSet
-  An array of records with kind, sourceURLs, and explanation. Each LINK has two distinct readable source URLs in direction order. SAME_TEXT and PASSAGES from P1 are deferred in this increment.
+  An array of records with kind, sourceURLs, and explanation. Each finding has two distinct readable source URLs. LINK uses direction order. SAME_TEXT and PASSAGES also supply two quotes in source order, taken from the corresponding stored passages (or the excerpt when passages are absent).
 opaque ReportDetails
   The owner, context, saved URLs, status, sources, and findings of one report.
 ```
@@ -51,13 +51,14 @@ a set of Sources with
   an optional pageDate String
   an optional finalUrl String
   a linksTo set of String
+  a passages set of String
   unique report and url
 a set of Findings with
   a report Report
   a kind Kind
   a sources set of Source
   an explanation String
-Rule: A report's URL selection and input order never change. A cancelled context cannot accept new work. Terminal reports cannot change. Sources and findings belong to one report and are stored within it. A LINK's ordered sourceURLs identify the source and target; its explanation states the direction. Findings do not establish identity or truth.
+Rule: A report's URL selection and input order never change. A cancelled context cannot accept new work. Terminal reports cannot change. Sources and findings belong to one report and are stored within it. A LINK's ordered sourceURLs identify the source and target; its explanation states the direction. SAME_TEXT quotes match apart from spacing, preserving case and punctuation. PASSAGES places source wording side by side. A finding cannot pair sources whose non-null final URLs are the same. Findings do not establish identity or truth.
 ```
 
 ## Actions
@@ -80,9 +81,9 @@ finish(report: Report, sourceData: SourceDataSet, findingData: FindingDataSet) :
   then
     set stored to false
     returns stored
-  where report is PENDING and results fail validation: exactly one outcome for every saved URL and no others; valid outcome and retrieval timestamp; title at most 200 characters, page date at most 80, and excerpt at most 1000; READABLE excerpts nonblank; UNAVAILABLE excerpts and links empty; links only to other saved URLs; final URL null or HTTPS on the original hostname without credentials or a nondefault port; at most 20 LINK findings, each with an explanation of at most 300 characters and two distinct readable sources supported by the first source's linksTo
+  where report is PENDING and results fail validation: exactly one outcome for every saved URL and no others; valid outcome and retrieval timestamp; title at most 200 characters, page date at most 80, and excerpt at most 1000; READABLE excerpts nonblank; UNAVAILABLE excerpts, links, and passages empty; at most 20 nonblank passages of at most 1000 characters; links only to other saved URLs; final URL null or HTTPS on the original hostname without credentials or a nondefault port; at most 60 findings, each with an explanation of at most 300 characters and two distinct readable sources; LINK supported by the first source's linksTo and no quotes; SAME_TEXT and PASSAGES with two exact quotes of 40–1000 characters from their corresponding source passages or fallback excerpts; SAME_TEXT quotes match apart from spacing
   then
-    refuses INVALID_RESEARCH_RESULT "Results must describe exactly the saved sources and supported links between them."
+    refuses INVALID_RESEARCH_RESULT "Results must describe exactly the saved sources and supported comparisons between them."
   where results are valid and report is still PENDING in an open context
   then
     create the report's Sources and Findings from sourceData and findingData and atomically set status to READY

@@ -1,0 +1,7 @@
+/sketches/draw_sketches.py
+node_modules/
+dist/
+.env
+.DS_Store
+coverage/
+~$*.pptx
