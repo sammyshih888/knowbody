@@ -20,6 +20,10 @@ The [tests](./tests/) create and remove separate test databases, leaving app dat
 
 [P2 video demo](https://youtu.be/mRnB3gWjQPk)
 
+## P3 Beta
+
+[P3 video demo](https://youtu.be/51wuxCRfxG4)
+
 ## P3 visual design study
 
 [Typography and color study](./visual-study.pptx): two annotated slides, with reference credits in the speaker notes.
