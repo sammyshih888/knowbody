@@ -4,6 +4,35 @@ A 6.1040 personal project about learning more before meeting someone. Two people
 
 [App](https://knowbody.mit-sdg.dev) · [User journey](#user-journey) · [Backend](./src/) · [Frontend](./web/) · [Current specifications](./design/) · [API reference](./generated/knowbody.md)
 
+## Build and run locally
+
+Install Bun 1.4.2 and Docker with Compose. From the repository root, install dependencies and build:
+
+```sh
+bun install --frozen-lockfile
+bun run build
+```
+
+The build creates the frontend in `dist/`. Bun runs the TypeScript backend directly, so it does not need a separate compilation step.
+
+With Docker running, start the built app:
+
+```sh
+bun run preview
+```
+
+This starts MongoDB, rebuilds the frontend, and serves the app at [http://127.0.0.1:3000](http://127.0.0.1:3000).
+
+For development with automatic reloads, stop the preview and run:
+
+```sh
+bun run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173). This starts MongoDB, the backend on port 3000, and the frontend on port 5173. Stop the app with Ctrl+C; `bun run db:down` stops MongoDB without deleting its data.
+
+The default local setup needs no `.env` file. It uses the MongoDB service in [compose.yaml](./compose.yaml) on port 27018. To use another database, set `MONGODB_URL` in a local `.env` file. In-app search also needs `TAVILY_API_KEY` in that file; without it, users can still paste public links. Building and testing need no search key. `.env` is ignored by Git.
+
 ## Tests
 
 With Bun 1.4.2 and Docker running, use:
