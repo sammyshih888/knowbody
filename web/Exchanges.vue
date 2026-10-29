@@ -155,14 +155,19 @@ async function act(action: string, run: () => Promise<{ error: string } | object
   finally { busy.value = false; refreshing.value = false; }
 }
 
-async function join() {
+async function reviewInvitation() {
   let token = invitation.value.trim();
   try { if (token.includes("://")) token = new URLSearchParams(new URL(token).hash.slice(1)).get("invite") ?? ""; }
   catch { token = ""; }
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
-    error.value = incomingInvitation.value ? "This invitation link is incomplete. Ask the sender for a new link." : "Paste a complete invitation link or code.";
+    error.value = "Paste a complete invitation link or code.";
     return;
   }
+  await router.push({ name: "new-exchange", hash: `#invite=${token}` });
+}
+async function join() {
+  if (!incomingInvitation.value || busy.value || invitationPreviewLoading.value || !inviterUsername.value) return;
+  const token = linkedInvitation.value;
   await act("join", async () => {
     const result = await api.exchanges.join({ invitation: token });
     if (!("error" in result)) {
@@ -314,12 +319,12 @@ onUnmounted(() => { disposed = true; });
         <small>Anyone signed in with the link can see your username and join once, within seven days. Send it only to the person you want to exchange with, through your existing chat.</small>
         <button class="primary full" :disabled="busy || !inviteCard">Create invitation</button>
       </form>
-      <form class="panel" @submit.prevent="join">
+      <form class="panel" @submit.prevent="reviewInvitation">
         <h2>Have an invitation?</h2>
         <label for="invitation">Invitation link or code</label>
         <input id="invitation" v-model="invitation" required autocomplete="off" placeholder="Paste the invitation here" />
-        <small>Joining connects your account. It does not share or approve your links.</small>
-        <button class="primary full" :disabled="busy || !invitation.trim()">Join invitation</button>
+        <small>See who invited you before choosing whether to join.</small>
+        <button class="primary full" :disabled="busy || !invitation.trim()">Review invitation</button>
       </form>
     </div>
     <template v-if="listing">
