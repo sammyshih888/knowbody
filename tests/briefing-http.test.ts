@@ -42,6 +42,30 @@ async function pair(a: Awaited<ReturnType<typeof account>>, b: Awaited<ReturnTyp
 const list = async (cookie: string, exchange: string) => (await post("/exchanges/list", {}, cookie)).body.collection.exchanges.find((row: any) => row.exchange === exchange);
 const approve = (cookie: string, exchange: string, revision = 2) => post("/exchanges/approve", { exchange, revision }, cookie);
 
+test("a forwarded invitation can be claimed once but cannot reveal pages without the owner's approval", async () => {
+  const owner = await account("Christie"), intended = await account("Alex"), holder = await account("Morgan");
+  const { exchange, invitation } = (await post("/exchanges/invite", { card: owner.card }, owner.cookie)).body;
+  expect((await post("/exchanges/join", { invitation })).status).toBe(401);
+  expect((await post("/exchanges/join", { invitation, user: intended.user }, holder.cookie)).status).toBe(400);
+  expect((await post("/exchanges/join", { invitation }, holder.cookie)).status).toBe(200);
+  expect((await post("/exchanges/join", { invitation }, intended.cookie)).status).toBe(409);
+  expect((await list(owner.cookie, exchange)).partner.username).toBe("Morgan");
+  const joined = await list(holder.cookie, exchange);
+  expect(joined.partner.username).toBe("Christie");
+  expect(joined.summary.otherPreview).toBe("Personal site");
+  for (const secret of [owner.card, "Christie private label", "https://www.mit.edu/Christie", invitation])
+    expect(JSON.stringify(joined)).not.toContain(secret);
+  await post("/exchanges/offer", { exchange, card: holder.card, revision: 1 }, holder.cookie);
+  expect((await approve(holder.cookie, exchange)).body.status).toBe("OPEN");
+  await runtime.tick(); await runtime.idle();
+  expect(fetches).toBe(0);
+  expect((await post("/cards/get", { card: owner.card }, holder.cookie)).status).toBe(404);
+  expect((await post("/exchanges/end", { exchange }, owner.cookie)).status).toBe(200);
+  expect((await post("/exchanges/join", { invitation }, intended.cookie)).status).toBe(409);
+  expect((await approve(holder.cookie, exchange)).status).toBe(409);
+  expect((await list(holder.cookie, exchange)).shared.card).toBeNull();
+}, 25000);
+
 test("mutual approval gates cards and briefs; offer changes reset consent; ending preserves only owner reports", async () => {
   const a = await account("Christie"), b = await account("Alex"), outsider = await account("Morgan");
   const exchange = await pair(a,b);

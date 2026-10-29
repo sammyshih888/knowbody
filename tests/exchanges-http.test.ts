@@ -64,8 +64,17 @@ test("three accounts can invite, join, and offer without revealing private selec
     expect(unclaimed).toHaveLength(1);
     expect(unclaimed[0].summary).toMatchObject({ invitation, ownItem: firstCard, revision: 1 });
     expect(unclaimed[0].partner).toEqual({ username: null });
+    expect((await post("/exchanges/preview", { invitation })).status).toBe(401);
+    expect((await post("/exchanges/preview", { invitation: "incomplete" }, alex.cookie)).status).toBe(400);
+    expect((await post("/exchanges/preview", { invitation, user: christie.user }, alex.cookie)).status).toBe(400);
+    expect((await post("/exchanges/preview", { invitation }, alex.cookie)).body).toEqual({ inviter: { username: "Christie" } });
+    expect((await post("/exchanges/preview", { invitation }, morgan.cookie)).body).toEqual({ inviter: { username: "Christie" } });
+    expect((await post("/exchanges/preview", { invitation }, christie.cookie)).body).toEqual({ inviter: null });
+    expect((await post("/exchanges/list", {}, christie.cookie)).body.collection.exchanges).toEqual(unclaimed);
+    expect((await post("/exchanges/list", {}, alex.cookie)).body.collection.exchanges).toEqual([]);
     expect((await post("/exchanges/join", { invitation }, christie.cookie)).status).toBe(409);
     expect((await post("/exchanges/join", { invitation }, alex.cookie)).body).toEqual({ exchange });
+    expect((await post("/exchanges/preview", { invitation }, morgan.cookie)).body).toEqual({ inviter: null });
     expect((await post("/exchanges/join", { invitation }, morgan.cookie)).status).toBe(409);
     expect((await post("/exchanges/list", {}, morgan.cookie)).body).toEqual({ collection: { exchanges: [] } });
     const joined = (await post("/exchanges/list", {}, alex.cookie)).body;
@@ -87,6 +96,7 @@ test("three accounts can invite, join, and offer without revealing private selec
     expect((await post("/exchanges/list", {}, christie.cookie)).body.collection.exchanges[0].summary).toMatchObject({ revision: 3, otherPreview: "Creative work" });
     expect((await post("/exchanges/end", { exchange }, morgan.cookie)).status).toBe(409);
     expect((await post("/exchanges/end", { exchange }, alex.cookie)).status).toBe(200);
+    expect((await post("/exchanges/preview", { invitation }, morgan.cookie)).body).toEqual({ inviter: null });
     expect((await post("/exchanges/list", {}, christie.cookie)).body.collection.exchanges[0].summary.status).toBe("ENDED");
     expect((await post("/exchanges/offer", { exchange, card: firstCard, revision: 3 }, christie.cookie)).status).toBe(409);
     expect((await post("/exchanges/join", { invitation }, morgan.cookie)).status).toBe(409);

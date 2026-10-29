@@ -1,5 +1,5 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
-import { each, form, former, no, view, where, whether } from "@mit-sdg/sync-engine/language";
+import { each, form, former, no, now, view, where, whether } from "@mit-sdg/sync-engine/language";
 import { concepts } from "../concepts.ts";
 import { approveInput, exchangeInput, inviteInput, joinInput, offerInput, sessionInput } from "./validators.ts";
 import { Brief, SharedOffer } from "./Briefing.ts";
@@ -13,8 +13,12 @@ const Partner = former("partner for (user) in (exchange)", ({ user, exchange }, 
   Exchanging._counterparty({ user, exchange }).is({ other }),
   Authenticating._get({ user: other }).is({ username }),
 ).form({ username })).optional();
-const ExchangeList = former("exchanges for (user)", ({ user }, { exchange, summary }) =>
-  form({ exchanges: each(Exchanging._byUser({ user }).is({ exchange, summary }))
+const InvitationSender = former("inviter of (invitation) for (user) at (instant)", ({ invitation, user, instant }, { inviter, username }) => where(
+  Exchanging._inviter({ user, invitation, now: instant }).is({ inviter }),
+  Authenticating._get({ user: inviter }).is({ username }),
+).form({ username })).optional();
+const ExchangeList = former("exchanges for (user) at (instant)", ({ user, instant }, { exchange, summary }) =>
+  form({ exchanges: each(Exchanging._byUser({ user, now: instant }).is({ exchange, summary }))
     .form({ exchange, summary, partner: whether(Partner({ user, exchange })),
       ownBrief: whether(Brief({ owner: user, viewer: user, exchange })),
       shared: whether(SharedOffer({ viewer: user, exchange })) }) }));
@@ -29,21 +33,28 @@ const Approve = endpoint("/exchanges/approve", ({ session, user, exchange, revis
       where(no(Approvable({ user, exchange, revision }))).then(respond({ error: "APPROVAL_NOT_READY" })).named("unavailable")),
   { input: { required: ["session", "exchange", "revision"] }, validators: { input: approveInput } });
 
-const Invite = endpoint("/exchanges/invite", ({ session, user, card, preview, exchange, invitation }) =>
+const Invite = endpoint("/exchanges/invite", ({ session, user, card, preview, exchange, invitation, instant }) =>
   receive({ session, card })
     .then(Sessioning.current({ session }).responds({ subject: user }))
     .then(
-      where(Offerable({ user, card }), Collecting._offerPreview({ owner: user, card }).is({ preview }))
-        .then(Exchanging.open({ first: user, item: card, preview }).responds({ exchange, invitation }))
+      where(Offerable({ user, card }), Collecting._offerPreview({ owner: user, card }).is({ preview }), now(instant))
+        .then(Exchanging.open({ first: user, item: card, preview, now: instant }).responds({ exchange, invitation }))
         .then(respond({ exchange, invitation })).named("owned-card"),
       where(no(Offerable({ user, card }))).then(respond({ error: "CARD_UNAVAILABLE" })).named("unavailable-card"),
     ),
   { input: { required: ["session", "card"] }, validators: { input: inviteInput } });
-const Join = endpoint("/exchanges/join", ({ session, user, invitation, exchange }) =>
+const Join = endpoint("/exchanges/join", ({ session, user, invitation, exchange, instant }) =>
   receive({ session, invitation })
     .then(Sessioning.current({ session }).responds({ subject: user }))
-    .then(Exchanging.join({ user, invitation }).responds({ exchange }))
-    .then(respond({ exchange })),
+    .then(where(now(instant))
+      .then(Exchanging.join({ user, invitation, now: instant }).responds({ exchange }))
+      .then(respond({ exchange }))),
+  { input: { required: ["session", "invitation"] }, validators: { input: joinInput } });
+const Preview = endpoint("/exchanges/preview", ({ session, user, invitation, instant }) =>
+  receive({ session, invitation })
+    .then(Sessioning.current({ session }).responds({ subject: user }))
+    .then(where(now(instant))
+      .then(respond({ inviter: InvitationSender({ user, invitation, instant }) }))),
   { input: { required: ["session", "invitation"] }, validators: { input: joinInput } });
 const Offer = endpoint("/exchanges/offer", ({ session, user, exchange, card, revision, preview, nextRevision }) =>
   receive({ session, exchange, card, revision })
@@ -55,10 +66,11 @@ const Offer = endpoint("/exchanges/offer", ({ session, user, exchange, card, rev
       where(no(Offerable({ user, card }))).then(respond({ error: "CARD_UNAVAILABLE" })).named("unavailable-card"),
     ),
   { input: { required: ["session", "exchange", "card", "revision"] }, validators: { input: offerInput } });
-const List = endpoint("/exchanges/list", ({ session, user }) =>
+const List = endpoint("/exchanges/list", ({ session, user, instant }) =>
   receive({ session })
     .then(Sessioning.current({ session }).responds({ subject: user }))
-    .then(respond({ collection: ExchangeList({ user }) })),
+    .then(where(now(instant))
+      .then(respond({ collection: ExchangeList({ user, instant }) }))),
   { input: { required: ["session"] }, validators: { input: sessionInput } });
 const End = endpoint("/exchanges/end", ({ session, user, exchange }) =>
   receive({ session, exchange })
@@ -67,4 +79,4 @@ const End = endpoint("/exchanges/end", ({ session, user, exchange }) =>
     .afterFlowSettles().then(respond({ exchange })),
   { input: { required: ["session", "exchange"] }, validators: { input: exchangeInput } });
 
-export const composition = { Offerable, Partner, ExchangeList, Approvable, Approve, Invite, Join, Offer, List, End };
+export const composition = { Offerable, Partner, InvitationSender, ExchangeList, Approvable, Approve, Invite, Join, Preview, Offer, List, End };

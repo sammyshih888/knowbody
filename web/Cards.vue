@@ -28,6 +28,11 @@ const showArchived = ref(false);
 const savedCards = computed(() => props.cards.filter(card => !card.archived));
 const archivedCards = computed(() => props.cards.filter(card => card.archived));
 const urls = computed(() => links.value.split(/\r?\n/).map(url => url.trim()).filter(Boolean));
+watch(() => route.fullPath, () => {
+  notice.value = "";
+  error.value = "";
+  archiveTarget.value = null;
+});
 
 function showError(code: string) {
   if (code === "UNAUTHORIZED") { emit("expired"); return; }
@@ -46,6 +51,7 @@ async function saveCard() {
     error.value = "Choose between one and five links, with one link on each line.";
     return;
   }
+  const destination = returnExchange.value ? `/exchanges/${encodeURIComponent(returnExchange.value)}` : "/cards";
   busy.value = true;
   try {
     const result = await api.cards.create({ label: label.value, urls: urls.value,
@@ -54,9 +60,9 @@ async function saveCard() {
     label.value = "";
     links.value = "";
     pageTypes.value = {};
-    notice.value = "Card saved. Only you can see these links.";
     await props.reloadCards();
-    await router.push(returnExchange.value ? `/exchanges/${encodeURIComponent(returnExchange.value)}` : "/cards");
+    await router.push(destination);
+    if (destination === "/cards" && route.name === "cards") notice.value = "Card saved.";
   } catch { error.value = "Couldn't save your card. Please try again."; }
   finally { busy.value = false; }
 }
@@ -115,7 +121,8 @@ async function archiveCard(card: string) {
                 <fieldset v-if="urls.length > 0 && urls.length <= 5" class="page-types"><legend>Choose each page type</legend><p class="muted">Only these categories appear to the other person before approval.</p><div v-for="(url, i) in urls" :key="`${i}-${url}`" class="selected-page"><div class="selection-heading"><label :for="`type-${i}`">{{ url }}</label><button type="button" class="text-button" :aria-label="`Remove ${url}`" @click="removeURL(url)">Remove</button></div><select :id="`type-${i}`" :value="pageTypes[url] ?? 'Public webpage'" @change="pageTypes[url] = ($event.target as HTMLSelectElement).value"><option v-for="category in categoryOptions" :key="category">{{ category }}</option></select></div></fieldset>
                 <p v-if="urls.length" class="selection-status" role="status">{{ urls.length }} {{ urls.length === 1 ? 'page' : 'pages' }} selected. Nothing is shared yet.</p>
                 <p class="save-note">Saved selections stay fixed. To choose different links, make another card.</p>
-                <button class="primary full" :disabled="busy">{{ busy ? 'Saving…' : 'Save private card' }}</button>
+                <p v-if="returnExchange" class="muted">After saving, you'll return to the exchange to choose this card and save your offer. Your links stay private until you both approve.</p>
+                <button class="primary full" :disabled="busy">{{ busy ? 'Saving…' : returnExchange ? 'Save card and return' : 'Save private card' }}</button>
               </form>
               </div>
             </section>

@@ -2,11 +2,14 @@
 
 `UI` denotes requests and responses. In authenticated rules, `user`, `owner`, or `viewer` comes from `Sessioning.current(session)`, never client input. `: (...)` names successful outputs; chained steps stay in the same request flow.
 
-[Register](reaction:Accounts.Register) creates an account; [sign in](reaction:Accounts.SignIn) starts a session; [current account](reaction:Accounts.Current) resolves it; [sign out](reaction:Accounts.SignOut) ends it.
+[Register](reaction:Accounts.Register) creates an account and starts its session in the same request flow, so a new user can continue without entering their credentials again. [Sign in](reaction:Accounts.SignIn) starts a session for an existing account; [current account](reaction:Accounts.Current) resolves it; [sign out](reaction:Accounts.SignOut) ends it.
 
 ```text
 when UI.register (username, password)
 then Authenticating.register (username, password)
+
+when Authenticating.register (username, password): (user) for a registration request
+then Sessioning.start (user)
 
 when UI.signIn (username, password)
 then Authenticating.authenticate (username, password)
@@ -29,7 +32,7 @@ when UI.signOut (session)
 then Sessioning.end (session)
 ```
 
-Registration returns user; sign-in returns user with an HttpOnly session cookie; sign-out returns ended. Concept refusals become error responses.
+Registration and sign-in return user with an HttpOnly session cookie; sign-out returns ended. The HTTP adapter puts the token in the cookie and removes it and its expiry from the JSON response. A refused registration does not start a session. Concept refusals become error responses.
 
 ```endpoints
 Accounts.Register at /auth/register

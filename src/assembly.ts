@@ -15,8 +15,9 @@ import { composition as Exchanges } from "./compositions/Exchanges.ts";
 import { composition as Discovery } from "./compositions/Discovery.ts";
 import { db } from "./db.ts";
 
-export function assembleApplication(database: Db = db) {
+export function assembleApplication(database: Db = db, clock?: () => Date) {
   return assemble({
+    clock,
     conceptSet: applicationConceptSet,
     instances: {
       Authenticating: new AuthenticatingConcept(database),

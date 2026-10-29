@@ -4,10 +4,11 @@ import { concepts } from "../concepts.ts";
 import { credentialsInput, sessionInput } from "./validators.ts";
 
 const { Authenticating, Sessioning } = concepts;
-const Register = endpoint("/auth/register", ({ username, password, user }) =>
+const Register = endpoint("/auth/register", ({ username, password, user, session, expiresAt }) =>
   receive({ username, password })
     .then(Authenticating.register({ username, password }).responds({ user }))
-    .then(respond({ user })),
+    .then(Sessioning.start({ subject: user }).responds({ session, expiresAt }))
+    .then(respond({ user, session, expiresAt })),
   { input: { required: ["username", "password"] }, validators: { input: credentialsInput } });
 
 const SignIn = endpoint("/auth/sign-in", ({ username, password, user, session, expiresAt }) =>

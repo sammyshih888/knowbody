@@ -6,7 +6,7 @@ Reach agreement on a two-way release without either person having to disclose fi
 
 ## Principle
 
-If one person offers an item and another joins and makes an offer, both can approve the same selection to activate the exchange. Changing an offer clears both approvals. Either person can end it.
+If one person offers an item and another joins within seven days and makes an offer, both can approve the same selection to activate the exchange. Changing an offer clears both approvals. Either person can end it. The invitation deadline only limits joining; it does not end an exchange that already has two participants.
 
 ## Types
 
@@ -17,7 +17,7 @@ external Item
   Something offered in the exchange.
 Status is OPEN or ACTIVE or ENDED
 opaque ExchangeSummary
-  A participant-relative record containing their own item and preview, the other preview, revision, status, and approval flags. It contains an invitation only for the inviter while unclaimed and open. It never contains the other item.
+  A participant-relative record containing their own item and preview, the other preview, revision, status, and approval flags. Only an inviter with an unclaimed OPEN exchange receives its stored invitation deadline, as an ISO date string or null if absent. Its invitation is included only before that deadline. It never contains the other item.
 ```
 
 ## State
@@ -27,6 +27,7 @@ a set of Exchanges with
   a first User
   an optional second User
   a unique invitation String
+  an optional invitationExpiresAt Date
   a firstItem Item
   a firstPreview String
   an optional secondItem Item
@@ -34,26 +35,26 @@ a set of Exchanges with
   a revision Number
   an approvals set of User
   a status Status
-Rule: Participants are distinct. Only participants approve. A revision identifies one fixed pair of offers. ACTIVE requires both offers and both approvals. ENDED never reopens.
+Rule: Participants are distinct. Only participants approve. A revision identifies one fixed pair of offers. ACTIVE requires both offers and both approvals. ENDED never reopens. New invitations expire seven days after opening. Joining requires a stored deadline strictly later than now; older invitations with no deadline cannot be claimed.
 ```
 
 ## Actions
 
 ```actions
-open(first: User, item: Item, preview: String) : returns (exchange: Exchange, invitation: String)
-  where item is empty or preview is blank or exceeds 200 characters
+open(first: User, item: Item, preview: String, now: Date) : returns (exchange: Exchange, invitation: String)
+  where item is empty, preview is blank or exceeds 200 characters, or now plus seven days is not a valid date
   then
-    refuses INVALID_INVITATION "Choose an item with a short preview."
-  where item and preview are valid
+    refuses INVALID_INVITATION "Choose an item with a short preview and a valid current time."
+  where item, preview, and now plus seven days are valid
   then
-    create an OPEN exchange with first, item as firstItem, preview as firstPreview, revision 1, no second participant or offer, no approvals, and a fresh unguessable invitation
+    create an OPEN exchange with first, item as firstItem, preview as firstPreview, revision 1, no second participant or offer, no approvals, a fresh unguessable invitation, and invitationExpiresAt set to now plus seven days
     returns exchange, invitation
 
-join(user: User, invitation: String) : returns (exchange: Exchange)
-  where no OPEN exchange has invitation and no second participant, or user is first
+join(user: User, invitation: String, now: Date) : returns (exchange: Exchange)
+  where now is invalid, no OPEN exchange has invitation and no second participant, user is first, or the stored deadline is absent or no later than now
   then
-    refuses INVITATION_UNAVAILABLE "This invitation cannot be joined. It may already be claimed or ended."
-  where invitation identifies an OPEN exchange with no second participant and user differs from first
+    refuses INVITATION_UNAVAILABLE "This invitation cannot be joined. It may be expired, claimed, or ended."
+  where now is valid, invitation identifies an OPEN exchange with no second participant, user differs from first, and its stored deadline is later than now
   then
     set second to user without approving or changing revision
     returns exchange
@@ -96,11 +97,14 @@ synchronize(exchange: Exchange) : returns (exchange: Exchange, status: Status | 
 ## Queries
 
 ```queries
-_byUser(user: User) : many (exchange: Exchange, summary: ExchangeSummary)
-  Answers only exchanges in which user participates, ordered by exchange identity. Each summary contains that user's item and preview, the other offer's preview, revision, status, and approval flags. An unclaimed OPEN invitation is included only for its inviter. Answers no rows for a user with no exchanges, including an unknown user.
+_byUser(user: User, now: Date) : many (exchange: Exchange, summary: ExchangeSummary)
+  Answers only exchanges in which user participates, ordered by exchange identity. Each summary contains that user's item and preview, the other offer's preview, revision, status, and approval flags. Only the inviter of an unclaimed OPEN exchange receives its stored deadline, or null if absent. The invitation is included only when its deadline is later than now. Answers no rows for a user with no exchanges, including an unknown user.
 
 _counterparty(user: User, exchange: Exchange) : optional (other: User)
   Answers the other participant if user participates and both participants exist. Answers no row for unknown exchanges, outsiders, or an unclaimed invitation.
+
+_inviter(user: User, invitation: String, now: Date) : optional (inviter: User)
+  Answers only the first user when invitation identifies an unclaimed OPEN exchange, user differs from first, and the stored deadline is later than a valid now. Otherwise answers no row, including for older invitations without a deadline. Leaves state unchanged and reveals no offered item or preview.
 
 _lifecycle() : many (exchange: Exchange, status: Status)
   Answers ACTIVE and ENDED exchanges ordered by identity for host recovery, or no rows when none exist.

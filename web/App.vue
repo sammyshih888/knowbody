@@ -55,19 +55,13 @@ async function submitAccount() {
   busy.value = true;
   try {
     const credentials = { username: username.value.trim(), password: password.value };
-    if (mode.value === "register") {
-      const result = await api.auth.register(credentials);
-      if ("error" in result) { showError(result.error); return; }
-      mode.value = "sign-in";
-      notice.value = "Account created. Sign in to start your first card.";
-      password.value = "";
-    } else {
-      const result = await api.auth["sign-in"](credentials);
-      if ("error" in result) { showError(result.error, "sign-in"); return; }
-      account.value = { user: result.user, username: credentials.username };
-      password.value = "";
-      await loadCards();
-    }
+    const registering = mode.value === "register";
+    const result = registering ? await api.auth.register(credentials) : await api.auth["sign-in"](credentials);
+    if ("error" in result) { showError(result.error, registering ? "account" : "sign-in"); return; }
+    account.value = { user: result.user, username: credentials.username };
+    password.value = "";
+    if (registering && !hasInvitation.value) notice.value = "Account created. You're signed in.";
+    await loadCards();
   } catch { error.value = "Couldn't connect to Knowbody. Please try again."; }
   finally { busy.value = false; }
 }
@@ -134,13 +128,13 @@ onMounted(async () => {
             <div class="privacy-note"><p>You each choose what to share.<br /><strong>Both approve before cards are shared.</strong></p></div>
           </section>
           <section class="panel auth-panel" aria-labelledby="account-heading">
-            <p v-if="hasInvitation" class="message success">You've received an invitation. Create an account or sign in, then choose Join invitation.</p>
+            <p v-if="hasInvitation" class="message success">You've opened an invitation. Create an account or sign in, then choose whether to join.</p>
             <div class="switcher" aria-label="Account options">
               <button :class="{ selected: mode === 'register' }" :disabled="busy" :aria-pressed="mode === 'register'" @click="mode = 'register'; error = ''; notice = ''">Create account</button>
               <button :class="{ selected: mode === 'sign-in' }" :disabled="busy" :aria-pressed="mode === 'sign-in'" @click="mode = 'sign-in'; error = ''; notice = ''">Sign in</button>
             </div>
             <h2 id="account-heading">{{ mode === 'register' ? 'Create your account' : 'Sign in to Knowbody' }}</h2>
-            <p class="muted">{{ mode === 'register' ? 'Save a private card, then invite someone to exchange cards.' : 'Return to your cards and exchanges.' }}</p>
+            <p class="muted">{{ hasInvitation ? 'Signing in does not join the exchange or share your links.' : mode === 'register' ? 'Save a private card, then invite someone to exchange cards.' : 'Return to your cards and exchanges.' }}</p>
             <form @submit.prevent="submitAccount">
               <label for="username">Username</label>
               <input id="username" v-model="username" autocomplete="username" required pattern="[A-Za-z0-9_-]{1,32}" maxlength="32" aria-describedby="username-hint" />

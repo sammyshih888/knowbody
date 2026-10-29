@@ -10,40 +10,45 @@ export class EndUnavailable extends Error {}
 type Status = "OPEN" | "ACTIVE" | "ENDED";
 interface Exchange {
   _id: string; invitation: string; first: string; second: string | null;
+  invitationExpiresAt?: Date;
   firstItem: string; firstPreview: string; secondItem: string | null; secondPreview: string | null;
   revision: number; approvals: string[]; status: Status;
 }
 export interface ExchangeSummary {
-  invitation: string | null; ownItem: string | null; ownPreview: string | null;
+  invitation: string | null; invitationExpiresAt: string | null; ownItem: string | null; ownPreview: string | null;
   otherPreview: string | null; revision: number; status: Status;
   ownApproved: boolean; otherApproved: boolean;
 }
 const validPreview = (preview: string) => typeof preview === "string" && preview.trim().length > 0 && preview.length <= 200;
+const validInstant = (value: Date) => value instanceof Date && Number.isFinite(value.getTime());
 
 export class ExchangingConcept {
   private readonly exchanges: Collection<Exchange>;
   private indexes?: Promise<string>;
   constructor(db: Db) { this.exchanges = db.collection<Exchange>("exchanging.exchanges"); }
 
-  async open({ first, item, preview }: { first: string; item: string; preview: string }): Promise<{ exchange: string; invitation: string }> {
-    if (!item || !validPreview(preview)) throw new InvalidInvitation("Choose an item with a short preview.");
+  async open({ first, item, preview, now }: { first: string; item: string; preview: string; now: Date }): Promise<{ exchange: string; invitation: string }> {
+    const invitationExpiresAt = new Date(validInstant(now) ? now.getTime() + 7 * 24 * 60 * 60 * 1000 : NaN);
+    if (!item || !validPreview(preview) || !validInstant(invitationExpiresAt))
+      throw new InvalidInvitation("Choose an item with a short preview and a valid current time.");
     await (this.indexes ??= this.exchanges.createIndex({ invitation: 1 }, { unique: true }).catch(error => {
       this.indexes = undefined;
       throw error;
     }));
     const exchange = crypto.randomUUID();
     const invitation = randomBytes(32).toString("base64url");
-    await this.exchanges.insertOne({ _id: exchange, invitation, first, second: null,
+    await this.exchanges.insertOne({ _id: exchange, invitation, invitationExpiresAt, first, second: null,
       firstItem: item, firstPreview: preview, secondItem: null, secondPreview: null,
       revision: 1, approvals: [], status: "OPEN" });
     return { exchange, invitation };
   }
 
-  async join({ user, invitation }: { user: string; invitation: string }): Promise<{ exchange: string }> {
+  async join({ user, invitation, now }: { user: string; invitation: string; now: Date }): Promise<{ exchange: string }> {
+    if (!validInstant(now)) throw new InvitationUnavailable("This invitation cannot be joined. It may be expired, claimed, or ended.");
     const row = await this.exchanges.findOneAndUpdate(
-      { invitation, status: "OPEN", second: null, first: { $ne: user } },
+      { invitation, invitationExpiresAt: { $gt: now }, status: "OPEN", second: null, first: { $ne: user } },
       { $set: { second: user } }, { returnDocument: "after" });
-    if (!row) throw new InvitationUnavailable("This invitation cannot be joined. It may already be claimed or ended.");
+    if (!row) throw new InvitationUnavailable("This invitation cannot be joined. It may be expired, claimed, or ended.");
     return { exchange: row._id };
   }
 
@@ -84,13 +89,16 @@ export class ExchangingConcept {
     return { exchange };
   }
 
-  async _byUser({ user }: { user: string }): Promise<{ exchange: string; summary: ExchangeSummary }[]> {
+  async _byUser({ user, now }: { user: string; now: Date }): Promise<{ exchange: string; summary: ExchangeSummary }[]> {
     const rows = await this.exchanges.find({ $or: [{ first: user }, { second: user }] }).sort({ _id: 1 }).toArray();
     return rows.map(row => {
       const isFirst = row.first === user;
       const other = isFirst ? row.second : row.first;
+      const unclaimed = isFirst && row.status === "OPEN" && !row.second;
+      const expiry = row.invitationExpiresAt;
       return { exchange: row._id, summary: {
-        invitation: isFirst && row.status === "OPEN" && !row.second ? row.invitation : null,
+        invitation: unclaimed && expiry && expiry > now ? row.invitation : null,
+        invitationExpiresAt: unclaimed && expiry ? expiry.toISOString() : null,
         ownItem: isFirst ? row.firstItem : row.secondItem,
         ownPreview: isFirst ? row.firstPreview : row.secondPreview,
         otherPreview: isFirst ? row.secondPreview : row.firstPreview,
@@ -105,6 +113,14 @@ export class ExchangingConcept {
     if (!row) return [];
     const other = row.first === user ? row.second : row.first;
     return other ? [{ other }] : [];
+  }
+
+  async _inviter({ user, invitation, now }: { user: string; invitation: string; now: Date }): Promise<{ inviter: string }[]> {
+    if (!validInstant(now)) return [];
+    const row = await this.exchanges.findOne(
+      { invitation, invitationExpiresAt: { $gt: now }, status: "OPEN", second: null, first: { $ne: user } },
+      { projection: { first: 1 } });
+    return row ? [{ inviter: row.first }] : [];
   }
 
   async synchronize({ exchange }: { exchange: string }): Promise<{ exchange: string; status: Status | null }> {

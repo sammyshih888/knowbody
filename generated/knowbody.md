@@ -56,10 +56,10 @@ Defined in [Exchanging](../design/concepts/Exchanging.md), line 1.
 
 #### Actions
 
-- `open(first: User, item: Item, preview: String) : returns (exchange: Exchange, invitation: String)`
-  - Refuses `INVALID_INVITATION`: Choose an item with a short preview.
-- `join(user: User, invitation: String) : returns (exchange: Exchange)`
-  - Refuses `INVITATION_UNAVAILABLE`: This invitation cannot be joined. It may already be claimed or ended.
+- `open(first: User, item: Item, preview: String, now: Date) : returns (exchange: Exchange, invitation: String)`
+  - Refuses `INVALID_INVITATION`: Choose an item with a short preview and a valid current time.
+- `join(user: User, invitation: String, now: Date) : returns (exchange: Exchange)`
+  - Refuses `INVITATION_UNAVAILABLE`: This invitation cannot be joined. It may be expired, claimed, or ended.
 - `offer(user: User, exchange: Exchange, item: Item, preview: String, revision: Number) : returns (exchange: Exchange, revision: Number)`
   - Refuses `OFFER_UNAVAILABLE`: The offer could not be changed. Reload the current exchange and try again.
 - `approve(user: User, exchange: Exchange, revision: Number) : returns (exchange: Exchange, status: Status)`
@@ -70,8 +70,9 @@ Defined in [Exchanging](../design/concepts/Exchanging.md), line 1.
 
 #### Queries
 
-- `_byUser(user: User) : many (exchange: Exchange, summary: ExchangeSummary)`
+- `_byUser(user: User, now: Date) : many (exchange: Exchange, summary: ExchangeSummary)`
 - `_counterparty(user: User, exchange: Exchange) : optional (other: User)`
+- `_inviter(user: User, invitation: String, now: Date) : optional (inviter: User)`
 - `_lifecycle() : many (exchange: Exchange, status: Status)`
 - `_active(exchange: Exchange) : one (active: Flag)`
 - `_participant(user: User, exchange: Exchange) : one (participant: Flag)`
@@ -226,7 +227,7 @@ Authored path: `Exchanges.Offerable`.
 ### (user) can approve (exchange) at (revision)
 
 Authored path: `Exchanges.Approvable`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
 
 ```view
 (user) can approve (exchange) at (revision) — inputs (user, exchange, revision); outputs (); bindings (first, second, firstItem, secondItem)
@@ -343,7 +344,7 @@ Former "details for (card)" — inputs (card); bindings (label, urls, pageTypes,
 ### partner for (user) in (exchange)
 
 Authored path: `Exchanges.Partner`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
 
 ```former
 Former "partner for (user) in (exchange)" — inputs (user, exchange); bindings (other, username); promises at most one record — forms:
@@ -371,21 +372,34 @@ Former "shared offer for (viewer) in (exchange)" — inputs (viewer, exchange); 
     urls
 ```
 
-### exchanges for (user)
+### exchanges for (user) at (instant)
 
 Authored path: `Exchanges.ExchangeList`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
 
 ```former
-Former "exchanges for (user)" — inputs (user); bindings (exchange, summary); promises exactly one record — forms:
+Former "exchanges for (user) at (instant)" — inputs (user, instant); bindings (exchange, summary); promises exactly one record — forms:
   a record of
-    exchanges: each Exchanging._byUser (user) has (exchange, summary)
+    exchanges: each Exchanging._byUser (now: instant, user) has (exchange, summary)
       form a record of
         exchange
         ownBrief: whether former "brief owned by (owner) in (exchange) for (viewer)" with (exchange, owner: user, viewer: user)
         partner: whether former "partner for (user) in (exchange)" with (exchange, user)
         shared: whether former "shared offer for (viewer) in (exchange)" with (exchange, viewer: user)
         summary
+```
+
+### inviter of (invitation) for (user) at (instant)
+
+Authored path: `Exchanges.InvitationSender`.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 7.
+
+```former
+Former "inviter of (invitation) for (user) at (instant)" — inputs (invitation, user, instant); bindings (inviter, username); promises at most one record — forms:
+  a record of
+    where Exchanging._inviter (invitation, now: instant, user) has (inviter)
+    where Authenticating._get (user: inviter) has (username)
+    username
 ```
 
 ### report details for (report)
@@ -425,7 +439,7 @@ Former "source brief work" — inputs (); bindings (exchange, report, urls); pro
 
 Authored path: `Accounts.Current`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 37.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 40.
 
 ```reaction
 when RequestBoundary.request (path: "/auth/current", requestId, session)
@@ -437,7 +451,7 @@ then
 
 Authored path: `Accounts.Current`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 37.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 40.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Accounts.Current
@@ -452,7 +466,7 @@ then
 
 Authored path: `Accounts.Current`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 37.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 40.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Accounts.Current
@@ -467,7 +481,7 @@ then
 
 Authored path: `Accounts.Register`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 35.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 38.
 
 ```reaction
 when RequestBoundary.request (password, path: "/auth/register", requestId, username)
@@ -479,21 +493,33 @@ then
 
 Authored path: `Accounts.Register`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 35.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 38.
 
 ```reaction
 when Authenticating.register (password, username, user), asked by Accounts.Register
+then
+  Sessioning.start (subject: user)
+```
+
+### Accounts.Register#3
+
+Authored path: `Accounts.Register`.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 5.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 38.
+
+```reaction
+when Sessioning.start (subject: user, expiresAt, session), asked by Accounts.Register#2
 where
   earlier, RequestBoundary.request (password, path: "/auth/register", requestId, username)
 then
-  RequestBoundary.respond (requestId, user)
+  RequestBoundary.respond (expiresAt, requestId, session, user)
 ```
 
 ### Accounts.SignIn
 
 Authored path: `Accounts.SignIn`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 36.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 39.
 
 ```reaction
 when RequestBoundary.request (password, path: "/auth/sign-in", requestId, username)
@@ -505,7 +531,7 @@ then
 
 Authored path: `Accounts.SignIn`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 36.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 39.
 
 ```reaction
 when Authenticating.authenticate (password, username, user), asked by Accounts.SignIn
@@ -517,7 +543,7 @@ then
 
 Authored path: `Accounts.SignIn`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 36.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 39.
 
 ```reaction
 when Sessioning.start (subject: user, expiresAt, session), asked by Accounts.SignIn#2
@@ -531,7 +557,7 @@ then
 
 Authored path: `Accounts.SignOut`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 38.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 41.
 
 ```reaction
 when RequestBoundary.request (path: "/auth/sign-out", requestId, session)
@@ -543,7 +569,7 @@ then
 
 Authored path: `Accounts.SignOut`.
 - Covered by [Accounts](../design/compositions/Accounts.md), line 5.
-- Covered by [Accounts](../design/compositions/Accounts.md), line 38.
+- Covered by [Accounts](../design/compositions/Accounts.md), line 41.
 
 ```reaction
 when Sessioning.end (session, ended), asked by Accounts.SignOut
@@ -1069,8 +1095,8 @@ then
 ### Exchanges.Approve
 
 Authored path: `Exchanges.Approve`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 49.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 63.
 
 ```reaction
 when RequestBoundary.request (exchange, path: "/exchanges/approve", requestId, revision, session)
@@ -1081,8 +1107,8 @@ then
 ### Exchanges.Approve:approved#2
 
 Authored path: `Exchanges.Approve`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 49.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 63.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.Approve
@@ -1096,8 +1122,8 @@ then
 ### Exchanges.Approve:approved#3
 
 Authored path: `Exchanges.Approve`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 49.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 63.
 
 ```reaction
 when Exchanging.approve (exchange, revision, user, status), asked by Exchanges.Approve:approved#2
@@ -1110,8 +1136,8 @@ then
 ### Exchanges.Approve:unavailable#2
 
 Authored path: `Exchanges.Approve`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 49.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 63.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.Approve
@@ -1125,8 +1151,8 @@ then
 ### Exchanges.End
 
 Authored path: `Exchanges.End`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 50.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 64.
 
 ```reaction
 when RequestBoundary.request (exchange, path: "/exchanges/end", requestId, session)
@@ -1137,8 +1163,8 @@ then
 ### Exchanges.End#2
 
 Authored path: `Exchanges.End`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 50.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 64.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.End
@@ -1151,8 +1177,8 @@ then
 ### Exchanges.End#3
 
 Authored path: `Exchanges.End`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 50.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 64.
 
 ```reaction
 when Exchanging.end (exchange, user), asked by Exchanges.End#2
@@ -1167,7 +1193,7 @@ then
 
 Authored path: `Exchanges.Invite`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 45.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 58.
 
 ```reaction
 when RequestBoundary.request (card, path: "/exchanges/invite", requestId, session)
@@ -1179,26 +1205,27 @@ then
 
 Authored path: `Exchanges.Invite`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 45.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 58.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.Invite
 where
+  instant is the current flow's instant
   earlier, RequestBoundary.request (card, path: "/exchanges/invite", requestId, session)
   view "(user) can offer (card)" with (card, user)
   Collecting._offerPreview (card, owner: user) has (preview)
 then
-  Exchanging.open (first: user, item: card, preview)
+  Exchanging.open (first: user, item: card, now: instant, preview)
 ```
 
 ### Exchanges.Invite:owned-card#3
 
 Authored path: `Exchanges.Invite`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 45.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 58.
 
 ```reaction
-when Exchanging.open (first: user, item: card, preview, exchange, invitation), asked by Exchanges.Invite:owned-card#2
+when Exchanging.open (first: user, item: card, now: instant, preview, exchange, invitation), asked by Exchanges.Invite:owned-card#2
 where
   earlier, RequestBoundary.request (card, path: "/exchanges/invite", requestId, session)
 then
@@ -1209,7 +1236,7 @@ then
 
 Authored path: `Exchanges.Invite`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 45.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 58.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.Invite
@@ -1224,7 +1251,7 @@ then
 
 Authored path: `Exchanges.Join`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 46.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 59.
 
 ```reaction
 when RequestBoundary.request (invitation, path: "/exchanges/join", requestId, session)
@@ -1236,24 +1263,25 @@ then
 
 Authored path: `Exchanges.Join`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 46.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 59.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.Join
 where
+  instant is the current flow's instant
   earlier, RequestBoundary.request (invitation, path: "/exchanges/join", requestId, session)
 then
-  Exchanging.join (invitation, user)
+  Exchanging.join (invitation, now: instant, user)
 ```
 
 ### Exchanges.Join#3
 
 Authored path: `Exchanges.Join`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 46.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 59.
 
 ```reaction
-when Exchanging.join (invitation, user, exchange), asked by Exchanges.Join#2
+when Exchanging.join (invitation, now: instant, user, exchange), asked by Exchanges.Join#2
 where
   earlier, RequestBoundary.request (invitation, path: "/exchanges/join", requestId, session)
 then
@@ -1263,8 +1291,8 @@ then
 ### Exchanges.List
 
 Authored path: `Exchanges.List`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 48.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 62.
 
 ```reaction
 when RequestBoundary.request (path: "/exchanges/list", requestId, session)
@@ -1275,22 +1303,23 @@ then
 ### Exchanges.List#2
 
 Authored path: `Exchanges.List`.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 22.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 48.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 34.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 62.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.List
 where
+  instant is the current flow's instant
   earlier, RequestBoundary.request (path: "/exchanges/list", requestId, session)
 then
-  RequestBoundary.respond (collection: former "exchanges for (user)" with (user), requestId)
+  RequestBoundary.respond (collection: former "exchanges for (user) at (instant)" with (instant, user), requestId)
 ```
 
 ### Exchanges.Offer
 
 Authored path: `Exchanges.Offer`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 47.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 61.
 
 ```reaction
 when RequestBoundary.request (card, exchange, path: "/exchanges/offer", requestId, revision, session)
@@ -1302,7 +1331,7 @@ then
 
 Authored path: `Exchanges.Offer`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 47.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 61.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.Offer
@@ -1318,7 +1347,7 @@ then
 
 Authored path: `Exchanges.Offer`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 47.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 61.
 
 ```reaction
 when Exchanging.offer (exchange, item: card, preview, revision, user, result.revision: nextRevision), asked by Exchanges.Offer:owned-card#2
@@ -1332,7 +1361,7 @@ then
 
 Authored path: `Exchanges.Offer`.
 - Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 3.
-- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 47.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 61.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by Exchanges.Offer
@@ -1341,6 +1370,33 @@ where
   no view "(user) can offer (card)" with (card, user)
 then
   RequestBoundary.respond (error: "CARD_UNAVAILABLE", requestId)
+```
+
+### Exchanges.Preview
+
+Authored path: `Exchanges.Preview`.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 7.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 60.
+
+```reaction
+when RequestBoundary.request (invitation, path: "/exchanges/preview", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### Exchanges.Preview#2
+
+Authored path: `Exchanges.Preview`.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 7.
+- Covered by [Invitations and offers](../design/compositions/Exchanges.md), line 60.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by Exchanges.Preview
+where
+  instant is the current flow's instant
+  earlier, RequestBoundary.request (invitation, path: "/exchanges/preview", requestId, session)
+then
+  RequestBoundary.respond (inviter: former "inviter of (invitation) for (user) at (instant)" with (instant, invitation, user), requestId)
 ```
 
 ## Endpoint input contracts
@@ -1368,4 +1424,5 @@ not listed here have no explicit input contract.
 - `/exchanges/join` — requires `session`, `invitation`
 - `/exchanges/list` — requires `session`
 - `/exchanges/offer` — requires `session`, `exchange`, `card`, `revision`
+- `/exchanges/preview` — requires `session`, `invitation`
 - `/reports/get` — requires `session`, `report`

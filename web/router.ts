@@ -41,5 +41,6 @@ router.afterEach(to => {
     cards: "Your cards", "new-card": "New card", exchanges: "Your exchanges",
     "new-exchange": "New exchange", exchange: "Your exchange",
   };
-  document.title = `${titles[String(to.name)] ?? "Page not found"} · Knowbody`;
+  const incomingInvitation = to.name === "new-exchange" && new URLSearchParams(to.hash.slice(1)).get("invite");
+  document.title = `${incomingInvitation ? "Join an exchange" : titles[String(to.name)] ?? "Page not found"} · Knowbody`;
 });

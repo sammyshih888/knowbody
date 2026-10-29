@@ -89,7 +89,9 @@ export type KnowbodyWire = {
       "username": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Authenticating"]["register"]>[0], ["username"]>>;
     };
     output: {
-      "user": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Authenticating"]["register"]>>, ["user"]>>;
+      "expiresAt": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Sessioning"]["start"]>>, ["expiresAt"]>>;
+      "session": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Sessioning"]["start"]>>, ["session"]>>;
+      "user": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["start"]>[0], ["subject"]>>;
     };
     error: { error: AppWideError | "INVALID_INPUT" | "INVALID_REGISTRATION" | "USERNAME_TAKEN" };
   };
@@ -256,6 +258,18 @@ export type KnowbodyWire = {
     };
     error: { error: AppWideError | "CARD_UNAVAILABLE" | "INVALID_INPUT" | "ITEM_REGISTERED" | "OFFER_UNAVAILABLE" | "UNKNOWN_SESSION" };
   };
+  "/exchanges/preview": {
+    input: {
+      "invitation": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Exchanging"]["_inviter"]>[0], ["invitation"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "inviter": {
+        "username": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Authenticating"]["_get"]>>>, ["username"]>>;
+      } | null;
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "ITEM_REGISTERED" | "UNKNOWN_SESSION" };
+  };
   "/reports/get": {
     input: {
       "report": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Researching"]["_get"]>[0], ["report"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sharing"]["_owned"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Researching"]["_get"]>[0], ["report"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sharing"]["_scopes"]>[0], ["item"]>]>]>>;
@@ -345,7 +359,7 @@ export type KnowbodyWireHttp = {
       "username": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Authenticating"]["register"]>[0], ["username"]>>;
     };
     output: {
-      "user": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Authenticating"]["register"]>>, ["user"]>>;
+      "user": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["start"]>[0], ["subject"]>>;
     };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" };
   };
@@ -495,6 +509,17 @@ export type KnowbodyWireHttp = {
       "revision": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Exchanging"]["offer"]>>, ["revision"]>>;
     };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/exchanges/preview": {
+    input: {
+      "invitation": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Exchanging"]["_inviter"]>[0], ["invitation"]>>;
+    };
+    output: {
+      "inviter": {
+        "username": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Authenticating"]["_get"]>>>, ["username"]>>;
+      } | null;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/reports/get": {
     input: {

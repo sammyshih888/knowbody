@@ -131,7 +131,65 @@ describe("Sessioning", () => {
 });
 
 describe("HTTP composition", () => {
-  test("empty database to private card, restart, second account, and sign-out", async () => {
+  test("invitation expiry uses server time, survives restart, and does not interrupt a joined exchange", async () => {
+    let instant = new Date("2099-01-01T12:00:00.000Z");
+    const deadline = "2099-01-08T12:00:00.000Z";
+    let application = assembleApplication(db, () => instant);
+    let gateway = createGateway({ application });
+    let handler = createHttpHandler({ application, gateway, policy });
+    const post = async (path: string, input: Record<string, unknown> = {}, cookie = "") => {
+      const response = await handler(new Request(`http://localhost:5173/api${path}`, {
+        method: "POST", headers: { "Content-Type": "application/json", Origin: "http://localhost:5173", Cookie: cookie }, body: JSON.stringify(input),
+      }));
+      return { status: response.status, body: await response.json() as any, cookie: response.headers.get("set-cookie")?.split(";")[0] ?? "" };
+    };
+    try {
+      const owner = (await post("/auth/register", { username: "Christie", password: "test-passphrase" })).cookie;
+      const partner = (await post("/auth/register", { username: "Alex", password: "test-passphrase" })).cookie;
+      const created = await post("/cards/create", { label: "Private pages", urls: links, pageTypes: ["Personal site", "Organization page"] }, owner);
+      expect(created.status).toBe(200);
+      const card = created.body.card;
+      for (const input of [{ card, now: deadline }, { card, invitationExpiresAt: "2199-01-01" }])
+        expect((await post("/exchanges/invite", input, owner)).status).toBe(400);
+      const invitationResult = await post("/exchanges/invite", { card }, owner);
+      expect(invitationResult).toMatchObject({ status: 200 });
+      const unused = invitationResult.body;
+      const joined = (await post("/exchanges/invite", { card }, owner)).body;
+      const before = (await post("/exchanges/list", {}, owner)).body.collection.exchanges;
+      expect(before).toHaveLength(2);
+      expect(before.every((entry: any) => entry.summary.invitationExpiresAt === deadline)).toBe(true);
+      instant = new Date(new Date(deadline).getTime() - 1);
+      expect((await post("/exchanges/preview", { invitation: unused.invitation }, partner)).body).toEqual({ inviter: { username: "Christie" } });
+      expect((await post("/exchanges/join", { invitation: joined.invitation }, partner)).status).toBe(200);
+
+      await gateway.beginDrain();
+      instant = new Date(deadline);
+      application = assembleApplication(db, () => instant);
+      gateway = createGateway({ application });
+      handler = createHttpHandler({ application, gateway, policy });
+      expect((await post("/exchanges/preview", { invitation: unused.invitation, now: "2099-01-01" }, partner)).status).toBe(400);
+      expect((await post("/exchanges/preview", { invitation: unused.invitation }, partner)).body).toEqual({ inviter: null });
+      expect((await post("/exchanges/join", { invitation: unused.invitation, now: "2099-01-01" }, partner)).status).toBe(400);
+      expect((await post("/exchanges/list", { now: "2099-01-01" }, owner)).status).toBe(400);
+      expect((await post("/exchanges/join", { invitation: unused.invitation }, partner)).status).toBe(409);
+      const expired = (await post("/exchanges/list", {}, owner)).body.collection.exchanges.find((entry: any) => entry.exchange === unused.exchange);
+      expect(expired.summary).toMatchObject({ invitation: null, invitationExpiresAt: deadline, status: "OPEN" });
+      expect(expired.partner.username).toBeNull();
+      const partnerList = (await post("/exchanges/list", {}, partner)).body.collection.exchanges;
+      expect(partnerList).toHaveLength(1);
+      expect(partnerList[0].exchange).toBe(joined.exchange);
+      expect(partnerList[0].shared.card).toBeNull();
+      const partnerCard = (await post("/cards/create", { label: "Alex's pages", urls: [links[0]], pageTypes: ["Personal site"] }, partner)).body.card;
+      expect((await post("/exchanges/offer", { exchange: joined.exchange, card: partnerCard, revision: 1 }, partner)).status).toBe(200);
+      expect((await post("/exchanges/approve", { exchange: joined.exchange, revision: 2 }, owner)).body.status).toBe("OPEN");
+      expect((await post("/exchanges/approve", { exchange: joined.exchange, revision: 2 }, partner)).body.status).toBe("ACTIVE");
+      expect((await post("/cards/get", { card }, partner)).status).toBe(200);
+      expect((await post("/exchanges/end", { exchange: unused.exchange }, owner)).status).toBe(200);
+      expect((await post("/exchanges/join", { invitation: unused.invitation }, partner)).status).toBe(409);
+    } finally { await gateway.beginDrain(); }
+  }, 20000);
+
+  test("registration signs in immediately; failed registration cannot issue a session; cards survive restart", async () => {
     let application = assembleApplication(db);
     let gateway = createGateway({ application });
     let handler = createHttpHandler({ application, gateway, policy });
@@ -143,8 +201,7 @@ describe("HTTP composition", () => {
     };
     try {
       expect((await post("/cards/list")).body).toMatchObject({ error: "UNAUTHORIZED" });
-      expect((await post("/auth/register", { username: "Christie", password: "test-passphrase" })).response.status).toBe(200);
-      const signedIn = await post("/auth/sign-in", { username: "Christie", password: "test-passphrase" });
+      const signedIn = await post("/auth/register", { username: "Christie", password: "test-passphrase" });
       expect(signedIn.response.status).toBe(200);
       expect(signedIn.response.headers.get("set-cookie")).toContain("HttpOnly");
       expect(signedIn.response.headers.get("set-cookie")).toContain("Secure");
@@ -152,6 +209,17 @@ describe("HTTP composition", () => {
       expect(signedIn.body).not.toHaveProperty("expiresAt");
       const christie = signedIn.cookie;
       expect(christie).toStartWith("__Host-");
+      const sessionCount = await db.collection("sessioning.sessions").countDocuments();
+      for (const credentials of [
+        { username: "Christie", password: "another-password" },
+        { username: "invalid username", password: "test-passphrase" },
+      ]) {
+        const failed = await post("/auth/register", credentials);
+        expect(failed.response.status).toBe(credentials.username === "Christie" ? 409 : 400);
+        expect(failed.response.headers.get("set-cookie")).toBeNull();
+        expect(failed.body).not.toHaveProperty("user");
+        expect(await db.collection("sessioning.sessions").countDocuments()).toBe(sessionCount);
+      }
       expect((await post("/auth/current", {}, christie)).body).toMatchObject({ username: "Christie" });
       expect((await post("/cards/list", {}, christie)).body).toEqual({ collection: { cards: [] } });
       expect((await post("/cards/create", { label: "Pages", urls: links, owner: "Alex" }, christie)).response.status).toBe(400);
@@ -179,6 +247,11 @@ describe("HTTP composition", () => {
       const out = await post("/auth/sign-out", {}, christie);
       expect(out.response.status).toBe(200);
       expect((await post("/cards/list", {}, christie)).body).toMatchObject({ error: "UNAUTHORIZED" });
+      const returned = await post("/auth/sign-in", { username: "Christie", password: "test-passphrase" });
+      expect(returned.response.status).toBe(200);
+      expect(returned.cookie).not.toBe(christie);
+      expect(returned.body).not.toHaveProperty("session");
+      expect((await post("/cards/get", { card }, returned.cookie)).response.status).toBe(200);
       expect((await post("/auth/current", {}, alex)).response.status).toBe(200);
       // A valid session must still receive an answer if its account is absent.
       await db.collection("authenticating.users").deleteOne({ username: "Alex" });
